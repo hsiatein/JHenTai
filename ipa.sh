@@ -1,3 +1,5 @@
+version=$(head -n 5 pubspec.yaml | tail -n 1 | cut -d ' ' -f 2)
+
 flutter precache --ios
 cd ios
 pod update
