@@ -126,6 +126,9 @@ class Routes {
 
   static const String configSync = "/setting_cloud/configSync";
 
+  static const String webdav = "/setting_webdav/webdavUrl";
+
+
   static final Transition defaultTransition = preferenceSetting.enableSwipeBackGesture.isTrue ? Transition.cupertino : Transition.fadeIn;
 
   static List<EHPage> pages = <EHPage>[
@@ -386,6 +389,12 @@ class Routes {
     ),
     EHPage(
       name: proxy,
+      page: () => const SettingProxyPage().withEscOrFifthButton2BackRightRoute(),
+      transition: defaultTransition,
+      offAllBefore: false,
+    ),
+    EHPage(
+      name: webdav,
       page: () => const SettingProxyPage().withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
       offAllBefore: false,
