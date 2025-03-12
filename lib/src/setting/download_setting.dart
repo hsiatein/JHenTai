@@ -133,7 +133,7 @@ class DownloadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCi
   }
 
   Future<void> saveDownloadWithoutAsking(bool value) async {
-    log.debug('saveDownloadWithoutAskingByDefault:$value');
+    log.debug('saveDownloadWithoutAsking:$value');
     this.downloadWithoutAsking.value = value;
     await saveBeanConfig();
   }

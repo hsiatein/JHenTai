@@ -31,6 +31,7 @@ class SettingNetworkPage extends StatelessWidget {
             _buildCacheImageExpireDuration(),
             _buildConnectTimeout(context),
             _buildReceiveTimeout(context),
+            _buildWebDAV(),
           ],
         ).withListTileTheme(context),
       ),
@@ -51,6 +52,14 @@ class SettingNetworkPage extends StatelessWidget {
       title: Text('proxyAddress'.tr),
       trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
       onTap: () => toRoute(Routes.proxy),
+    );
+  }
+
+  Widget _buildWebDAV() {
+    return ListTile(
+      title: Text('webdav'.tr),
+      trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
+      onTap: () => toRoute(Routes.webdav),
     );
   }
 

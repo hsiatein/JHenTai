@@ -28,6 +28,7 @@ import 'package:jhentai/src/pages/setting/eh/setting_eh_page.dart';
 import 'package:jhentai/src/pages/setting/eh/tagsets/tag_sets_page.dart';
 import 'package:jhentai/src/pages/setting/mousewheel/setting_mouse_wheel_page.dart';
 import 'package:jhentai/src/pages/setting/network/proxy/setting_proxy_page.dart';
+import 'package:jhentai/src/pages/setting/network/webdav/setting_webdav_page.dart';
 import 'package:jhentai/src/pages/setting/network/setting_network_page.dart';
 import 'package:jhentai/src/pages/setting/performance/setting_performace_page.dart';
 import 'package:jhentai/src/pages/setting/preference/block_rule/blocking_rule_page.dart';
@@ -117,6 +118,8 @@ class Routes {
 
   static const String hostMapping = "/setting_network/hostMapping";
   static const String proxy = "/setting_network/proxy";
+  static const String webdav = "/setting_network/webdav";
+
 
   static const String extraGalleryScanPath = "/setting_download/extraGalleryScanPath";
 
@@ -126,7 +129,6 @@ class Routes {
 
   static const String configSync = "/setting_cloud/configSync";
 
-  static const String webdav = "/setting_webdav/webdavUrl";
 
 
   static final Transition defaultTransition = preferenceSetting.enableSwipeBackGesture.isTrue ? Transition.cupertino : Transition.fadeIn;
@@ -395,7 +397,7 @@ class Routes {
     ),
     EHPage(
       name: webdav,
-      page: () => const SettingProxyPage().withEscOrFifthButton2BackRightRoute(),
+      page: () => const SettingWebDAVPage().withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
       offAllBefore: false,
     ),

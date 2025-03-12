@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/network/eh_request.dart';
+import 'package:jhentai/src/service/storage_service.dart';
 
 import '../service/jh_service.dart';
 import '../service/log.dart';
@@ -20,6 +21,9 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
   RxnString proxyPassword = RxnString();
   RxInt connectTimeout = 6000.obs;
   RxInt receiveTimeout = 6000.obs;
+  RxBool enableWebDAV = false.obs;
+  RxnString webdavURL = RxnString();
+  RxnString webdavPassword = RxnString();
 
   static const Map<String, List<String>> host2IPs = {
     'e-hentai.org': ['104.20.18.168', '104.20.19.168', '172.67.2.238'],
@@ -62,6 +66,9 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
     proxyPassword.value = map['proxyPassword'] ?? proxyPassword.value;
     connectTimeout.value = map['connectTimeout'] ?? connectTimeout.value;
     receiveTimeout.value = map['receiveTimeout'] ?? receiveTimeout.value;
+    enableWebDAV.value = map['enableWebDAV'] ?? enableWebDAV.value;
+    webdavURL.value = map['webdavURL'] ?? webdavURL.value;
+    webdavPassword = map['webdavPassword'] ?? webdavPassword.value;
   }
 
   @override
@@ -76,6 +83,9 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
       'proxyPassword': proxyPassword.value,
       'connectTimeout': connectTimeout.value,
       'receiveTimeout': receiveTimeout.value,
+      'enableWebDAV': enableWebDAV.value,
+      'webdavURL': webdavURL.value,
+      'webdavPassword': webdavPassword.value
     });
   }
 
@@ -111,7 +121,13 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
     this.proxyPassword.value = proxyPassword;
     await saveBeanConfig();
   }
-
+  Future<void> saveWebDAV(bool enableWebDAV, String? webdavURL, String? webdavPassword) async {
+    log.debug('saveWebDAV:$enableWebDAV,$webdavURL,$webdavPassword');
+    this.enableWebDAV.value = enableWebDAV;
+    this.webdavURL.value = webdavURL;
+    this.webdavPassword.value = webdavPassword;
+    await saveBeanConfig();
+  }
   Future<void> saveConnectTimeout(int connectTimeout) async {
     log.debug('saveConnectTimeout:$connectTimeout');
     this.connectTimeout.value = connectTimeout;
