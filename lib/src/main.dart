@@ -105,7 +105,7 @@ void main(List<String> args) async {
     systemNavigationBarDividerColor: Colors.transparent,
     statusBarColor: Colors.transparent,
   ));
-
+  //sort dependencies before initializing, avoid circular dependency
   lifeCircleBeans = topologicalSort(lifeCircleBeans);
   for (JHLifeCircleBean bean in lifeCircleBeans) {
     await bean.initBean();

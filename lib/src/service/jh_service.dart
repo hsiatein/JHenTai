@@ -12,7 +12,7 @@ abstract interface class JHLifeCircleBean {
 
   void afterBeanReady();
 }
-
+//含异常捕获的JH生命周期
 mixin JHLifeCircleBeanErrorCatch {
   List<JHLifeCircleBean> get initDependencies => [pathService, log];
 
@@ -38,7 +38,7 @@ mixin JHLifeCircleBeanErrorCatch {
 
   Future<void> doAfterBeanReady();
 }
-
+//含保存的JH生命周期
 mixin JHLifeCircleBeanWithConfigStorage {
   List<JHLifeCircleBean> get initDependencies => [pathService, log, localConfigService];
 
