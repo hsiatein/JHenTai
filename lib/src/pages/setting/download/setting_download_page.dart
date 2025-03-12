@@ -58,6 +58,7 @@ class _SettingDownloadPageState extends State<SettingDownloadPage> {
               _buildExtraGalleryScanPath(),
               if (GetPlatform.isDesktop) _buildSingleImageSavePath(),
               _buildDownloadOriginalImage(),
+              _buildDownloadWithoutAsking(),
               _buildDefaultGalleryGroup(context),
               _buildDefaultArchiveGroup(context),
               _buildDownloadConcurrency(),
@@ -125,6 +126,16 @@ class _SettingDownloadPageState extends State<SettingDownloadPage> {
           return;
         }
         downloadSetting.saveDownloadOriginalImageByDefault(value);
+      },
+    );
+  }
+
+  Widget _buildDownloadWithoutAsking() {
+    return SwitchListTile(
+      title: Text('downloadWithoutAsking'.tr),
+      value: downloadSetting.downloadWithoutAsking.value,
+      onChanged: (value) {
+        downloadSetting.saveDownloadWithoutAsking(value);
       },
     );
   }

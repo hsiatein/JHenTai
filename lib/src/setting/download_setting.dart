@@ -17,6 +17,7 @@ class DownloadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCi
   late String defaultDownloadPath;
   late RxString downloadPath;
   RxBool downloadOriginalImageByDefault = false.obs;
+  RxBool downloadWithoutAsking = true.obs;
   RxnString defaultGalleryGroup = RxnString();
   RxnString defaultArchiveGroup = RxnString();
   late String defaultExtraGalleryScanPath;
@@ -126,6 +127,12 @@ class DownloadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCi
   Future<void> saveDownloadOriginalImageByDefault(bool value) async {
     log.debug('saveDownloadOriginalImageByDefault:$value');
     this.downloadOriginalImageByDefault.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveDownloadWithoutAsking(bool value) async {
+    log.debug('saveDownloadWithoutAskingByDefault:$value');
+    this.downloadWithoutAsking.value = value;
     await saveBeanConfig();
   }
 

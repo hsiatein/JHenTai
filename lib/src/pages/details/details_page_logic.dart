@@ -351,15 +351,21 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
 
     /// new download
     if (galleryDownloadedData == null || downloadProgress == null) {
-      ({String group, bool downloadOriginalImage})? result = await Get.dialog(
-        EHDownloadDialog(
-          title: 'chooseGroup'.tr,
-          currentGroup: downloadSetting.defaultGalleryGroup.value,
-          candidates: galleryDownloadService.allGroups,
-          showDownloadOriginalImageCheckBox: userSetting.hasLoggedIn(),
-          downloadOriginalImage: downloadSetting.downloadOriginalImageByDefault.value,
-        ),
-      );
+      ({String group, bool downloadOriginalImage})? result;
+      if(!downloadSetting.downloadWithoutAsking.value){
+        result = await Get.dialog(
+          EHDownloadDialog(
+            title: 'chooseGroup'.tr,
+            currentGroup: downloadSetting.defaultGalleryGroup.value,
+            candidates: galleryDownloadService.allGroups,
+            showDownloadOriginalImageCheckBox: userSetting.hasLoggedIn(),
+            downloadOriginalImage: downloadSetting.downloadOriginalImageByDefault.value,
+          ),
+        );
+      }
+      else{
+        result=(group:downloadSetting.defaultGalleryGroup.value ?? 'default'.tr,downloadOriginalImage:downloadSetting.downloadOriginalImageByDefault.value);
+      }
 
       if (result == null) {
         return;
