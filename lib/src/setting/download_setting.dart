@@ -49,6 +49,7 @@ class DownloadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCi
       extraGalleryScanPath.value = extraGalleryScanPath.toSet().toList();
     }
     downloadOriginalImageByDefault.value = map['downloadOriginalImageByDefault'] ?? downloadOriginalImageByDefault.value;
+    downloadWithoutAsking.value = map['downloadWithoutAsking'] ?? downloadWithoutAsking.value;
     defaultGalleryGroup.value = map['defaultGalleryGroup'];
     defaultArchiveGroup.value = map['defaultArchiveGroup'];
     downloadTaskConcurrency.value = map['downloadTaskConcurrency'];
@@ -71,6 +72,7 @@ class DownloadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCi
       'extraGalleryScanPath': extraGalleryScanPath.value,
       'singleImageSavePath': singleImageSavePath.value,
       'downloadOriginalImageByDefault': downloadOriginalImageByDefault.value,
+      'downloadWithoutAsking': downloadWithoutAsking.value,
       'defaultGalleryGroup': defaultGalleryGroup.value,
       'defaultArchiveGroup': defaultArchiveGroup.value,
       'downloadTaskConcurrency': downloadTaskConcurrency.value,
