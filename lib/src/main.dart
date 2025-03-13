@@ -112,9 +112,7 @@ void main(List<String> args) async {
   for (JHLifeCircleBean bean in lifeCircleBeans) {
     await bean.initBean();
   }
-  if(networkSetting.enableWebDAV.value){
-    webdavService.webdavDownloadData();
-  }
+  webdavService.webdavDownloadData();
   runApp(const MyApp());
 }
 

@@ -6,6 +6,8 @@ import 'package:jhentai/src/extension/list_extension.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'jh_service.dart';
 import 'log.dart';
+import 'package:jhentai/src/service/webdav_service.dart';
+
 
 HistoryService historyService = HistoryService();
 
@@ -45,6 +47,7 @@ class HistoryService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean
           lastReadTime: DateTime.now().toString(),
         ),
       );
+      webdavService.webdavUploadData();
     } on Exception catch (e) {
       log.error('Record history failed!', e);
     }

@@ -39,6 +39,7 @@ import '../../service/log.dart';
 import '../../widget/auto_mode_interval_dialog.dart';
 import '../../widget/loading_state_indicator.dart';
 
+
 class ReadPageLogic extends GetxController {
   final String pageId = 'pageId';
   final String layoutId = 'layoutId';
@@ -616,7 +617,6 @@ class ReadPageLogic extends GetxController {
       subConfigKey: state.readPageInfo.readProgressRecordStorageKey,
       value: state.readPageInfo.currentImageIndex.toString(),
     );
-    
   }
 
   void clearImageContainerSized() {

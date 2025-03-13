@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
-import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/service/webdav_service.dart';
 import 'package:jhentai/src/service/log.dart';
