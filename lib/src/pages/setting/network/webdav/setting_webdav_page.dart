@@ -46,8 +46,8 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
             _buildWebDAVURL(),
             _buildWebDAVUserName(),
             _buildWebDAVPassword(),
+            _buildEnableWebDAVSynchronizeGallery(),
             _buildSynchronizeNow(),
-            _buildEnableWebDAVSynchronizeGallery()
           ],
         ),
       ).withListTileTheme(context),
@@ -117,7 +117,7 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
       onTap: () {
         webdavService.testSynchronize();
         log.info('测试同步');
-        webdavService.webdavUploadGallery(1);
+        webdavService.webdavUploadAllGalleries();
       },
     );
   }

@@ -113,6 +113,7 @@ void main(List<String> args) async {
     await bean.initBean();
   }
   webdavService.webdavDownloadData();
+  webdavService.webdavUploadAllGalleries();
   runApp(const MyApp());
 }
 

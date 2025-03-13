@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
+import 'package:get/get_rx/get_rx.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 import 'package:get/get_utils/get_utils.dart';
 
@@ -38,6 +39,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
   String webdavRemotePath='/JHentaiData';
   bool enable=false;
   bool enableGallery=false;
+  
 
   @override
   Future<void> doInitBean() async {
@@ -45,7 +47,15 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     enableGallery=networkSetting.enableWebDAVSynchronizeGallery.value;
     if(enable){
       Get.put(this, permanent: true);
-      webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
+      webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '', debug:true);
+      // 设置公共请求头
+      webdavClient?.setHeaders({'accept-charset': 'utf-8'});
+      // 设置连接服务器超时时间（毫秒）
+      webdavClient?.setConnectTimeout(8000);
+      // 设置发送数据超时时间（毫秒）
+      webdavClient?.setSendTimeout(8000);
+      // 设置接收数据超时时间（毫秒）
+      webdavClient?.setReceiveTimeout(8000);
       await webdavClient?.mkdir('/JHentaiData');
       final directory = io.Directory.current;
       webdavCachePath = '${directory.path}/cache';
@@ -60,6 +70,9 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
   Future<void> testSynchronize() async {
     if(enable){
       try {
+        log.info(webdavClient?.uri??'');
+        log.info(webdavClient?.auth.user??'');
+        log.info(webdavClient?.auth.pwd??'');
         await webdavClient?.ping();
         var list = await webdavClient?.readDir('/JHentaiData/');
         list?.forEach((f) {
@@ -69,6 +82,35 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       } catch (e) {
         log.info('$e');
         toast('fail'.tr);
+      }
+    }
+  }
+
+  Future<void> webdavUploadAllGalleries() async {
+    if(enable && enableGallery){
+      try {
+        await webdavClient?.mkdir('$webdavRemotePath/download');
+        var cloudList = await webdavClient?.readDir('/JHentaiData/download');
+        cloudList?.forEach((f) {
+          print('${f.path}');
+        });
+        
+        final directory = io.Directory(downloadSetting.downloadPath.value);
+        var folders = directory.listSync().whereType<io.Directory>();
+        for (var folder in folders) {
+          log.info(folder.path);
+          String gidStr = path.basename(folder.path).split(' - ')[0];
+          int gid = int.tryParse(gidStr) ?? -1;
+          if(gid == -1){
+            continue;
+          }
+          if (!(cloudList?.any((file) => path.basename(file.path ?? '').startsWith(gidStr)) ?? false)) {
+            await webdavUploadGallery(gid);
+          }
+        }
+
+      } catch (e) {
+        log.info('$e');
       }
     }
   }
@@ -111,25 +153,32 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         var folders = directory.listSync().whereType<io.Directory>();
         for (var folder in folders) {
           if (path.basename(folder.path).startsWith('$gid - ')) {
-            await _zipFolder(folder.path);
-            var zipFile=io.File('${folder.path}.zip');
+            await _zipFolder(folder.path,'$gid');
+            var zipFile=io.File('${downloadSetting.downloadPath.value}/$gid.zip');
+            log.info('打包为 ${zipFile.path}');
             if(await zipFile.exists()){
-              await webdavClient?.writeFromFile(zipFile.path, '$webdavRemotePath/download/${path.basename(zipFile.path)}');
-              zipFile.delete();
+              CancelToken c = CancelToken();
+              await webdavClient?.writeFromFile(zipFile.path, '$webdavRemotePath/download/${path.basename(zipFile.path)}',onProgress: (c, t) {log.info(c / t);}, cancelToken: c);
             }
+            else{
+              log.info('${zipFile.path} 不存在');
+            }
+            await zipFile.delete();
             break;
           }
         }
 
-        log.info('画廊导出到云端成功');
+        log.info('画廊 $gid 导出到云端成功');
       } catch (e) {
         log.info('$e');
       }
     }
   }
 
-  Future<void> _zipFolder(String folderPath) async {
-    var zipFilePath = '$folderPath.zip';
+
+
+  Future<void> _zipFolder(String folderPath,String zipName) async {
+    var zipFilePath = '${io.File(folderPath).parent.path}/$zipName.zip';
     if (await io.File(zipFilePath).exists()) {
       return;
     }
