@@ -6,6 +6,9 @@ import 'package:jhentai/src/service/tag_translation_service.dart';
 
 import '../database/database.dart';
 import 'jh_service.dart';
+import 'package:jhentai/src/service/webdav_service.dart';
+import 'log.dart';
+
 
 SearchHistoryService searchHistoryService = SearchHistoryService();
 
@@ -60,17 +63,32 @@ class SearchHistoryService with JHLifeCircleBeanWithConfigStorage implements JHL
     }
 
     await saveBeanConfig();
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
   }
 
   Future<void> deleteHistory(SearchHistory searchHistory) async {
     if (histories.remove(searchHistory)) {
       await saveBeanConfig();
     }
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
   }
 
   Future<void> clearHistory() async {
     histories.clear();
     await clearBeanConfig();
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
   }
 
   /// find each pair and then translate, remains the parts which can't be translated

@@ -9,6 +9,7 @@ import '../model/gallery_comment.dart';
 import '../model/gallery_tag.dart';
 import 'jh_service.dart';
 import 'log.dart';
+import 'package:jhentai/src/service/webdav_service.dart';
 
 LocalBlockRuleService localBlockRuleService = LocalBlockRuleService();
 
@@ -99,7 +100,11 @@ class LocalBlockRuleService with JHLifeCircleBeanErrorCatch implements JHLifeCir
         expression: Value(rule.expression),
       ),
     );
-
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
     return Future.value((success: true, msg: null));
   }
 
@@ -130,7 +135,11 @@ class LocalBlockRuleService with JHLifeCircleBeanErrorCatch implements JHLifeCir
         );
       }
     });
-
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
     return Future.value((success: true, msg: null));
   }
 
@@ -142,7 +151,11 @@ class LocalBlockRuleService with JHLifeCircleBeanErrorCatch implements JHLifeCir
       log.error('Remove block rule failed, update database failed.');
       return Future.value((success: false, msg: 'Update database failed'));
     }
-
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
     return Future.value((success: true, msg: null));
   }
 

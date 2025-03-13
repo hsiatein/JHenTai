@@ -11,6 +11,8 @@ import 'package:jhentai/src/utils/toast_util.dart';
 import 'jh_service.dart';
 import 'log.dart';
 import '../widget/eh_search_config_dialog.dart';
+import 'package:jhentai/src/service/webdav_service.dart';
+
 
 QuickSearchService quickSearchService = QuickSearchService();
 
@@ -61,6 +63,11 @@ class QuickSearchService extends GetxController with JHLifeCircleBeanWithConfigS
     updateSafely();
     
     toast('saveSuccess'.tr);
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
   }
 
   Future<void> removeQuickSearch(String name) async {
@@ -69,6 +76,11 @@ class QuickSearchService extends GetxController with JHLifeCircleBeanWithConfigS
     quickSearchConfigs.remove(name);
     await saveBeanConfig();
     update();
+    try{
+      webdavService.webdavUploadData();
+    } on Exception catch (e) {
+      log.error('Record history failed!', e);
+    }
   }
 
   Future<void> reOrderQuickSearch(int oldIndex, int newIndex) async {

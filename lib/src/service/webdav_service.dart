@@ -77,7 +77,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         if(await io.File(webdavCacheJsonPath).exists()){
           await webdavClient?.writeFromFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', cancelToken:CancelToken());
         }
-        log.info('同步成功');
+        log.info('导出到云端成功');
       } catch (e) {
         log.info('$e');
       }
@@ -91,6 +91,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         if (await io.File(webdavCacheJsonPath).exists()) {
           _importData();
         }
+        log.info('从云端导入成功');
       } catch (e) {
         log.info('$e');
       }
@@ -115,7 +116,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       for (CloudConfig config in configs) {
         await cloudConfigService.importConfig(config);
       }
-      log.info('success'.tr);
       _importDataLoadingState = false;
     } catch (e, s) {
       log.error('Import data failed', e, s);
@@ -162,8 +162,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       final file = io.File(webdavCacheJsonPath);
       await file.writeAsString(await isolateService.jsonEncodeAsync(uploadConfigs));
       if (await io.File(webdavCacheJsonPath).exists()) {
-        log.info('Export data to $webdavCacheJsonPath success');
-        log.info('success'.tr);
         _exportDataLoadingState = false;
       }
     } on Exception catch (e) {
@@ -201,8 +199,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         await file.create(recursive: true);
       }
       await file.writeAsString(await isolateService.jsonEncodeAsync(uploadConfigs));
-      log.info('Export data to $webdavCacheJsonPath success');
-      log.info('success'.tr);
       _exportDataLoadingState = false;
     } on Exception catch (e) {
       log.error('Export data failed', e);
