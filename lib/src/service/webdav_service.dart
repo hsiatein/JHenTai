@@ -91,6 +91,10 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       log.info(webdavClient?.uri??'');
       log.info(webdavClient?.auth.user ?? '');
       log.info(webdavClient?.auth.pwd ?? '');
+      var list = await webdavClient?.readDir('/');
+      list?.forEach((f) {
+        print('${f.name} ${f.path}');
+      });
     } catch (e) {
       log.info('$e');
     }
