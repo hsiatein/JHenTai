@@ -30,6 +30,7 @@
 .pub-cache/
 .pub/
 /build/
+.build/
 pubspec.lock
 
 # Web related

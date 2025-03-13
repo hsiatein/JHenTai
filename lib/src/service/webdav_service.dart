@@ -37,6 +37,13 @@ import 'package:path/path.dart' as path;
 import 'package:path/path.dart';
 import 'package:retry/retry.dart';
 import 'package:drift/drift.dart';
+import 'package:jhentai/src/enum/config_type_enum.dart';
+import 'package:jhentai/src/service/cloud_service.dart';
+import 'package:jhentai/src/widget/loading_state_indicator.dart';
+import 'package:jhentai/src/extension/widget_extension.dart' as widget_extension;
+import 'package:file_picker/file_picker.dart';
+import 'package:jhentai/src/model/config.dart';
+import 'package:jhentai/src/service/isolate_service.dart';
 
 import '../consts/locale_consts.dart';
 import '../database/dao/gallery_image_dao.dart';
@@ -60,43 +67,175 @@ WebDAVService webdavService = WebDAVService();
 
 class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   webdav_client.Client? webdavClient;
-  Worker? _synchronizeListener;
+  bool _exportDataLoadingState = false;
+  bool _importDataLoadingState = false;
+  String webdavCachePath='';
+  String webdavCacheJsonPath='';
+  String webdavRemotePath='/JHentaiData';
+
   @override
   Future<void> doInitBean() async {
     Get.put(this, permanent: true);
     webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
-    _synchronizeListener = everAll(
-      [],
-      (_) {
-        synchronize();
-      },
-    );
+    await webdavClient?.mkdir('/JHentaiData');
+    final directory = io.Directory.current;
+    webdavCachePath = '${directory.path}/cache';
+    webdavCacheJsonPath = '$webdavCachePath/${CloudConfigService.configFileName}-WebDAV.json';
   }
 
   @override
   Future<void> doAfterBeanReady() async {}
 
-  @override
-  void onClose() {
-    super.onClose();
 
-    _synchronizeListener?.dispose();
-  }
-
-  Future<void> synchronize() async {
-    // 测试服务是否可以连接
+  Future<void> testSynchronize() async {
     try {
       await webdavClient?.ping();
-      log.info('success');
-      log.info(webdavClient?.uri??'');
-      log.info(webdavClient?.auth.user ?? '');
-      log.info(webdavClient?.auth.pwd ?? '');
       var list = await webdavClient?.readDir('/');
       list?.forEach((f) {
-        print('${f.name} ${f.path}');
+        print('${f.path}');
       });
+      toast('success'.tr);
     } catch (e) {
       log.info('$e');
+      toast('fail'.tr);
+    }
+  }
+
+  Future<void> updateData() async {
+    try {
+      await webdavClient?.mkdir(webdavRemotePath);
+      await _exportData();
+      if(await io.File(webdavCacheJsonPath).exists()){
+        await webdavClient?.writeFromFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', cancelToken:CancelToken());
+      }
+    } catch (e) {
+      log.info('$e');
+    }
+  }
+  Future<void> downloadData() async {
+    try {
+      await _createCache();
+      await webdavClient?.read2File('$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', webdavCacheJsonPath);
+      if (await io.File(webdavCacheJsonPath).exists()) {
+        _importData();
+      }
+    } catch (e) {
+      log.info('$e');
+    }
+  }
+
+  Future<void> _importData() async {
+
+    if (_importDataLoadingState) {
+      return;
+    }
+
+    log.info('Import data from $webdavCacheJsonPath');
+    _importDataLoadingState = true;
+
+
+    try {
+      io.File file = io.File(webdavCacheJsonPath);
+      String string = await file.readAsString();
+      List list = await isolateService.jsonDecodeAsync(string);
+      List<CloudConfig> configs = list.map((e) => CloudConfig.fromJson(e)).toList();
+      for (CloudConfig config in configs) {
+        await cloudConfigService.importConfig(config);
+      }
+      toast('success'.tr);
+      _importDataLoadingState = false;
+    } catch (e, s) {
+      log.error('Import data failed', e, s);
+      toast('internalError'.tr);
+      _importDataLoadingState = false;
+      return;
+    }
+  }
+
+  Future<void> _exportData() async {
+    List<CloudConfigTypeEnum> result = [CloudConfigTypeEnum.blockRules,CloudConfigTypeEnum.history,CloudConfigTypeEnum.quickSearch,CloudConfigTypeEnum.readIndexRecord,CloudConfigTypeEnum.searchHistory];
+
+    String fileName = '${CloudConfigService.configFileName}-WebDAV.json';
+    if (GetPlatform.isMobile) {
+      return _exportDataMobile(fileName, result);
+    } else {
+      return _exportDataDesktop(fileName, result);
+    }
+  }
+
+  Future<void> _createCache() async {
+      // cache目录如果不存在，则创建目录
+      final cacheDirectory = io.Directory(webdavCachePath);
+      if (!await cacheDirectory.exists()) {
+        await cacheDirectory.create(recursive: true);
+      } 
+  }
+
+  Future<void> _exportDataMobile(String fileName, List<CloudConfigTypeEnum>? result) async {
+    if (_exportDataLoadingState) {
+      return;
+    }
+    _exportDataLoadingState = true;
+
+    List<CloudConfig> uploadConfigs = [];
+    for (CloudConfigTypeEnum type in result!) {
+      CloudConfig? config = await cloudConfigService.getLocalConfig(type);
+      if (config != null) {
+        uploadConfigs.add(config);
+      }
+    }
+    try {
+      await _createCache();
+      final file = io.File(webdavCacheJsonPath);
+      await file.writeAsString(await isolateService.jsonEncodeAsync(uploadConfigs));
+      if (await io.File(webdavCacheJsonPath).exists()) {
+        log.info('Export data to $webdavCacheJsonPath success');
+        toast('success'.tr);
+        _exportDataLoadingState = false;
+      }
+    } on Exception catch (e) {
+      log.error('Export data failed', e);
+      toast('internalError'.tr);
+      _exportDataLoadingState = false;
+    }
+  }
+
+  Future<void> _exportDataDesktop(String fileName, List<CloudConfigTypeEnum>? result) async {
+    if (_exportDataLoadingState) {
+      return;
+    }
+    _exportDataLoadingState = true;
+    try {
+      await _createCache();
+    } on Exception catch (e) {
+      log.error('Select save path for exporting data failed', e);
+      toast('internalError'.tr);
+      _exportDataLoadingState = false;
+      return;
+    }
+
+    List<CloudConfig> uploadConfigs = [];
+    for (CloudConfigTypeEnum type in result!) {
+      CloudConfig? config = await cloudConfigService.getLocalConfig(type);
+      if (config != null) {
+        uploadConfigs.add(config);
+      }
+    }
+
+    io.File file = io.File(webdavCacheJsonPath);
+    try {
+      if (await file.exists()) {
+        await file.create(recursive: true);
+      }
+      await file.writeAsString(await isolateService.jsonEncodeAsync(uploadConfigs));
+      log.info('Export data to $webdavCacheJsonPath success');
+      toast('success'.tr);
+      _exportDataLoadingState = false;
+    } on Exception catch (e) {
+      log.error('Export data failed', e);
+      toast('internalError'.tr);
+      _exportDataLoadingState = false;
+      file.delete().ignore();
     }
   }
 }
