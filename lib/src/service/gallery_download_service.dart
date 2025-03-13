@@ -52,6 +52,7 @@ import 'path_service.dart';
 import '../utils/eh_executor.dart';
 import '../utils/eh_spider_parser.dart';
 import '../utils/snack_util.dart';
+import 'package:jhentai/src/service/webdav_service.dart';
 
 /// Responsible for local images meta-data and download all images of a gallery
 GalleryDownloadService galleryDownloadService = GalleryDownloadService();
@@ -1290,6 +1291,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
       await _updateGalleryDownloadStatus(gallery, DownloadStatus.downloaded);
       galleryDownloadInfos[gallery.gid]!.speedComputer.dispose();
       update(['$galleryDownloadSuccessId::${gallery.gid}']);
+      webdavService.webdavUploadGallery(gallery.gid);
     }
 
     update(['$galleryDownloadProgressId::${gallery.gid}']);

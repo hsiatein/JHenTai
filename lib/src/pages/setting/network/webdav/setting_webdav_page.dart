@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
+import 'package:jhentai/src/service/storage_service.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/service/webdav_service.dart';
 import 'package:jhentai/src/service/log.dart';
@@ -19,6 +20,7 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
   String? webdavURL = networkSetting.webdavURL.value;
   String? webdavUserName = networkSetting.webdavUserName.value;
   String? webdavPassword = networkSetting.webdavPassword.value;
+  bool enableWebDAVSynchronizeGallery = networkSetting.enableWebDAVSynchronizeGallery.value;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +32,7 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: () {
-              networkSetting.saveWebDAV(enableWebDAV, webdavURL, webdavUserName, webdavPassword);
+              networkSetting.saveWebDAV(enableWebDAV, webdavURL, webdavUserName, webdavPassword,enableWebDAVSynchronizeGallery);
               toast('success'.tr);
             },
           ),
@@ -44,7 +46,8 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
             _buildWebDAVURL(),
             _buildWebDAVUserName(),
             _buildWebDAVPassword(),
-            _buildSynchronizeNow()
+            _buildSynchronizeNow(),
+            _buildEnableWebDAVSynchronizeGallery()
           ],
         ),
       ).withListTileTheme(context),
@@ -57,7 +60,7 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
       value: networkSetting.enableWebDAV.value,
       onChanged: (value) {
         enableWebDAV=value;
-        networkSetting.saveWebDAV(value, webdavURL, webdavUserName, webdavPassword);
+        networkSetting.saveWebDAV(value, webdavURL, webdavUserName, webdavPassword,enableWebDAVSynchronizeGallery);
       },
     );
   }
@@ -112,10 +115,20 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
     return ListTile(
       title: Text('synchronizeNow'.tr),
       onTap: () {
-        webdavService.webdavUploadData();
-        webdavService.webdavDownloadData();
         webdavService.testSynchronize();
         log.info('测试同步');
+        webdavService.webdavUploadGallery(1);
+      },
+    );
+  }
+
+  Widget _buildEnableWebDAVSynchronizeGallery() {
+    return SwitchListTile(
+      title: Text('enableWebDAVSynchronizeGallery'.tr),
+      value: networkSetting.enableWebDAVSynchronizeGallery.value,
+      onChanged: (value) {
+        enableWebDAVSynchronizeGallery=value;
+        networkSetting.saveWebDAV(value, webdavURL, webdavUserName, webdavPassword,enableWebDAVSynchronizeGallery);
       },
     );
   }

@@ -25,6 +25,7 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
   RxnString webdavURL = RxnString();
   RxnString webdavUserName = RxnString();
   RxnString webdavPassword = RxnString();
+  RxBool enableWebDAVSynchronizeGallery = false.obs;
 
   static const Map<String, List<String>> host2IPs = {
     'e-hentai.org': ['104.20.18.168', '104.20.19.168', '172.67.2.238'],
@@ -71,6 +72,7 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
     webdavURL.value = map['webdavURL'] ?? webdavURL.value;
     webdavUserName.value = map['webdavUserName'] ?? webdavUserName.value;
     webdavPassword.value = map['webdavPassword'] ?? webdavPassword.value;
+    enableWebDAVSynchronizeGallery.value = map['enableWebDAVSynchronizeGallery'] ?? enableWebDAVSynchronizeGallery.value;
   }
 
   @override
@@ -89,6 +91,7 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
       'webdavURL': webdavURL.value,
       'webdavPassword': webdavPassword.value,
       'webdavUserName': webdavUserName.value,
+      'enableWebDAVSynchronizeGallery': enableWebDAVSynchronizeGallery.value,
     });
   }
 
@@ -124,14 +127,16 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
     this.proxyPassword.value = proxyPassword;
     await saveBeanConfig();
   }
-  Future<void> saveWebDAV(bool enableWebDAV, String? webdavURL, String? webdavUserName, String? webdavPassword) async {
-    log.debug('saveWebDAV:$enableWebDAV,$webdavURL,$webdavUserName,$webdavPassword');
+  Future<void> saveWebDAV(bool enableWebDAV, String? webdavURL, String? webdavUserName, String? webdavPassword,bool enableWebDAVSynchronizeGallery) async {
+    log.debug('saveWebDAV:$enableWebDAV,$webdavURL,$webdavUserName,$webdavPassword,$enableWebDAVSynchronizeGallery');
     this.enableWebDAV.value = enableWebDAV;
     this.webdavURL.value = webdavURL;
     this.webdavUserName.value = webdavUserName;
     this.webdavPassword.value = webdavPassword;
+    this.enableWebDAVSynchronizeGallery.value=enableWebDAVSynchronizeGallery;
     await saveBeanConfig();
   }
+
   Future<void> saveConnectTimeout(int connectTimeout) async {
     log.debug('saveConnectTimeout:$connectTimeout');
     this.connectTimeout.value = connectTimeout;

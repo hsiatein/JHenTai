@@ -8,7 +8,6 @@ import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 import 'package:get/get_utils/get_utils.dart';
-import 'package:jhentai/src/service/storage_service.dart';
 
 import 'package:jhentai/src/setting/network_setting.dart';
 
@@ -23,6 +22,9 @@ import 'package:jhentai/src/service/isolate_service.dart';
 
 import 'jh_service.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav_client;
+import 'package:jhentai/src/setting/download_setting.dart';
+import 'package:path/path.dart' as path;
+import 'package:archive/archive_io.dart';
 
 /// Responsible for local images meta-data and download all images of a gallery
 WebDAVService webdavService = WebDAVService();
@@ -35,10 +37,12 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
   String webdavCacheJsonPath='';
   String webdavRemotePath='/JHentaiData';
   bool enable=false;
+  bool enableGallery=false;
 
   @override
   Future<void> doInitBean() async {
     enable=networkSetting.enableWebDAV.value;
+    enableGallery=networkSetting.enableWebDAVSynchronizeGallery.value;
     if(enable){
       Get.put(this, permanent: true);
       webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
@@ -57,7 +61,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     if(enable){
       try {
         await webdavClient?.ping();
-        var list = await webdavClient?.readDir('/');
+        var list = await webdavClient?.readDir('/JHentaiData/');
         list?.forEach((f) {
           print('${f.path}');
         });
@@ -96,6 +100,44 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         log.info('$e');
       }
     }
+  }
+
+  Future<void> webdavUploadGallery(int gid) async {
+    if(enable && enableGallery){
+      try {
+        await webdavClient?.mkdir('$webdavRemotePath/download');
+        log.info(downloadSetting.downloadPath.value);
+        final directory = io.Directory(downloadSetting.downloadPath.value);
+        var folders = directory.listSync().whereType<io.Directory>();
+        for (var folder in folders) {
+          if (path.basename(folder.path).startsWith('$gid - ')) {
+            await _zipFolder(folder.path);
+            var zipFile=io.File('${folder.path}.zip');
+            if(await zipFile.exists()){
+              await webdavClient?.writeFromFile(zipFile.path, '$webdavRemotePath/download/${path.basename(zipFile.path)}');
+              zipFile.delete();
+            }
+            break;
+          }
+        }
+
+        log.info('画廊导出到云端成功');
+      } catch (e) {
+        log.info('$e');
+      }
+    }
+  }
+
+  Future<void> _zipFolder(String folderPath) async {
+    var zipFilePath = '$folderPath.zip';
+    if (await io.File(zipFilePath).exists()) {
+      return;
+    }
+    final encoder = ZipFileEncoder();
+    encoder.create(zipFilePath);
+    encoder.addDirectory(io.Directory(folderPath));
+    encoder.close();
+    log.info('Folder zip successfully: $zipFilePath');
   }
 
   Future<void> _importData() async {
