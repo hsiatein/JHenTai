@@ -113,8 +113,8 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
     return ListTile(
       title: Text('synchronizeNow'.tr),
       onTap: () {
-        webdavService.updateData();
-        webdavService.downloadData();
+        webdavService.webdavUploadData();
+        webdavService.webdavDownloadData();
         webdavService.testSynchronize();
         log.info('测试同步');
       },

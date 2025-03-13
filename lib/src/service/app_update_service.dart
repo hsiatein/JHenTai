@@ -25,6 +25,7 @@ import 'package:jhentai/src/setting/super_resolution_setting.dart';
 import 'package:jhentai/src/utils/convert_util.dart';
 import 'package:path/path.dart';
 
+
 import '../database/database.dart';
 import '../model/gallery.dart';
 import '../pages/search/mixin/search_page_logic_mixin.dart';

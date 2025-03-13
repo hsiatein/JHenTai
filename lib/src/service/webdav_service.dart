@@ -101,7 +101,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     }
   }
 
-  Future<void> updateData() async {
+  Future<void> webdavUploadData() async {
     try {
       await webdavClient?.mkdir(webdavRemotePath);
       await _exportData();
@@ -112,7 +112,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       log.info('$e');
     }
   }
-  Future<void> downloadData() async {
+  Future<void> webdavDownloadData() async {
     try {
       await _createCache();
       await webdavClient?.read2File('$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', webdavCacheJsonPath);
@@ -142,11 +142,11 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       for (CloudConfig config in configs) {
         await cloudConfigService.importConfig(config);
       }
-      toast('success'.tr);
+      log.info('success'.tr);
       _importDataLoadingState = false;
     } catch (e, s) {
       log.error('Import data failed', e, s);
-      toast('internalError'.tr);
+      log.info('internalError'.tr);
       _importDataLoadingState = false;
       return;
     }
@@ -190,12 +190,12 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       await file.writeAsString(await isolateService.jsonEncodeAsync(uploadConfigs));
       if (await io.File(webdavCacheJsonPath).exists()) {
         log.info('Export data to $webdavCacheJsonPath success');
-        toast('success'.tr);
+        log.info('success'.tr);
         _exportDataLoadingState = false;
       }
     } on Exception catch (e) {
       log.error('Export data failed', e);
-      toast('internalError'.tr);
+      log.info('internalError'.tr);
       _exportDataLoadingState = false;
     }
   }
@@ -209,7 +209,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       await _createCache();
     } on Exception catch (e) {
       log.error('Select save path for exporting data failed', e);
-      toast('internalError'.tr);
+      log.info('internalError'.tr);
       _exportDataLoadingState = false;
       return;
     }
@@ -229,11 +229,11 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       }
       await file.writeAsString(await isolateService.jsonEncodeAsync(uploadConfigs));
       log.info('Export data to $webdavCacheJsonPath success');
-      toast('success'.tr);
+      log.info('success'.tr);
       _exportDataLoadingState = false;
     } on Exception catch (e) {
       log.error('Export data failed', e);
-      toast('internalError'.tr);
+      log.info('internalError'.tr);
       _exportDataLoadingState = false;
       file.delete().ignore();
     }

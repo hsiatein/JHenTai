@@ -616,6 +616,7 @@ class ReadPageLogic extends GetxController {
       subConfigKey: state.readPageInfo.readProgressRecordStorageKey,
       value: state.readPageInfo.currentImageIndex.toString(),
     );
+    
   }
 
   void clearImageContainerSized() {
