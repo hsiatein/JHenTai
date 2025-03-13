@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
+import 'package:jhentai/src/service/webdav_service.dart';
+import 'package:jhentai/src/service/log.dart';
 
 import '../../../../setting/network_setting.dart';
 
@@ -15,6 +17,7 @@ class SettingWebDAVPage extends StatefulWidget {
 class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
   bool enableWebDAV = networkSetting.enableWebDAV.value;
   String? webdavURL = networkSetting.webdavURL.value;
+  String? webdavUserName = networkSetting.webdavUserName.value;
   String? webdavPassword = networkSetting.webdavPassword.value;
 
   @override
@@ -27,7 +30,7 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: () {
-              networkSetting.saveWebDAV(enableWebDAV, webdavURL, webdavPassword);
+              networkSetting.saveWebDAV(enableWebDAV, webdavURL, webdavUserName, webdavPassword);
               toast('success'.tr);
             },
           ),
@@ -39,7 +42,9 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
           children: [
             _buildEnableWebDAV(),
             _buildWebDAVURL(),
+            _buildWebDAVUserName(),
             _buildWebDAVPassword(),
+            _buildSynchronizeNow()
           ],
         ),
       ).withListTileTheme(context),
@@ -52,7 +57,7 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
       value: networkSetting.enableWebDAV.value,
       onChanged: (value) {
         enableWebDAV=value;
-        networkSetting.saveWebDAV(value,webdavURL,webdavPassword);
+        networkSetting.saveWebDAV(value, webdavURL, webdavUserName, webdavPassword);
       },
     );
   }
@@ -73,6 +78,21 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
     );
   }
 
+  Widget _buildWebDAVUserName() {
+    return ListTile(
+      title: Text('webdavUserName'.tr),
+      trailing: SizedBox(
+        width: 150,
+        child: TextField(
+          controller: TextEditingController(text: networkSetting.webdavUserName.value),
+          decoration: const InputDecoration(isDense: true, labelStyle: TextStyle(fontSize: 12)),
+          textAlign: TextAlign.center,
+          onChanged: (String value) => webdavUserName = value,
+        ),
+      ),
+    );
+  }
+
   Widget _buildWebDAVPassword() {
     return ListTile(
       title: Text('webdavPassword'.tr),
@@ -85,6 +105,16 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
           onChanged: (String value) => webdavPassword = value,
         ),
       ),
+    );
+  }
+
+  Widget _buildSynchronizeNow() {
+    return ListTile(
+      title: Text('synchronizeNow'.tr),
+      onTap: () {
+        webdavService.synchronize();
+        log.info('测试同步');
+      },
     );
   }
 }

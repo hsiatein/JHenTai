@@ -23,6 +23,7 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
   RxInt receiveTimeout = 6000.obs;
   RxBool enableWebDAV = false.obs;
   RxnString webdavURL = RxnString();
+  RxnString webdavUserName = RxnString();
   RxnString webdavPassword = RxnString();
 
   static const Map<String, List<String>> host2IPs = {
@@ -68,7 +69,8 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
     receiveTimeout.value = map['receiveTimeout'] ?? receiveTimeout.value;
     enableWebDAV.value = map['enableWebDAV'] ?? enableWebDAV.value;
     webdavURL.value = map['webdavURL'] ?? webdavURL.value;
-    webdavPassword = map['webdavPassword'] ?? webdavPassword.value;
+    webdavUserName.value = map['webdavUserName'] ?? webdavUserName.value;
+    webdavPassword.value = map['webdavPassword'] ?? webdavPassword.value;
   }
 
   @override
@@ -85,7 +87,8 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
       'receiveTimeout': receiveTimeout.value,
       'enableWebDAV': enableWebDAV.value,
       'webdavURL': webdavURL.value,
-      'webdavPassword': webdavPassword.value
+      'webdavPassword': webdavPassword.value,
+      'webdavUserName': webdavUserName.value,
     });
   }
 
@@ -121,10 +124,11 @@ class NetworkSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCir
     this.proxyPassword.value = proxyPassword;
     await saveBeanConfig();
   }
-  Future<void> saveWebDAV(bool enableWebDAV, String? webdavURL, String? webdavPassword) async {
-    log.debug('saveWebDAV:$enableWebDAV,$webdavURL,$webdavPassword');
+  Future<void> saveWebDAV(bool enableWebDAV, String? webdavURL, String? webdavUserName, String? webdavPassword) async {
+    log.debug('saveWebDAV:$enableWebDAV,$webdavURL,$webdavUserName,$webdavPassword');
     this.enableWebDAV.value = enableWebDAV;
     this.webdavURL.value = webdavURL;
+    this.webdavUserName.value = webdavUserName;
     this.webdavPassword.value = webdavPassword;
     await saveBeanConfig();
   }
