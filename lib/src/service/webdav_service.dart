@@ -39,7 +39,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
   bool _importDataLoadingState = false;
   String webdavCachePath='';
   String webdavCacheJsonPath='';
-  String webdavRemotePath='/JHentaiData';
+  final String webdavRemotePath='/JHentaiData';
   bool enable=false;
   bool enableGallery=false;
   
@@ -225,9 +225,15 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         await webdavClient?.mkdir(webdavRemotePath);
         await _exportData();
         if(await io.File(webdavCacheJsonPath).exists()){
-          await _uploadFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json');
+          String zipJsonPath =webdavCacheJsonPath+".zip";
+          var encoder = ZipFileEncoder();
+          encoder.create(zipJsonPath);
+          encoder.addFile(io.File(webdavCacheJsonPath));
+          encoder.close();
+          await io.File(webdavCacheJsonPath).delete();
+          await _uploadFile(zipJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json.zip');
+          await io.File(zipJsonPath).delete();
         }
-        await io.File(webdavCacheJsonPath).delete();
         log.info('导出到云端成功');
       } catch (e) {
         log.error('$e');
@@ -238,10 +244,13 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     if(enable){
       try {
         await _createCache();
-        await webdavClient?.read2File('$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', webdavCacheJsonPath);
+        await webdavClient?.read2File('$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json.zip', webdavCacheJsonPath+'.zip');
+        await extractFileToDisk(webdavCacheJsonPath+'.zip', webdavCachePath);
+        io.File(webdavCacheJsonPath+'.zip').delete();
         if (await io.File(webdavCacheJsonPath).exists()) {
-          _importData();
+          await _importData();
         }
+        io.File(webdavCacheJsonPath).delete();
         log.info('从云端导入成功');
       } catch (e) {
         log.error('$e');
