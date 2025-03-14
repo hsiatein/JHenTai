@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:core';
 import 'dart:io' as io;
-
 import 'package:dio/dio.dart';
 
 import 'package:get/get_core/src/get_main.dart';
@@ -20,6 +19,7 @@ import 'package:jhentai/src/service/cloud_service.dart';
 
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'jh_service.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav_client;
@@ -28,7 +28,7 @@ import 'package:path/path.dart' as path;
 import 'package:archive/archive_io.dart';
 import 'dart:convert';
 import 'package:jhentai/src/service/gallery_download_service.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:jhentai/src/service/path_service.dart';
 
 /// Responsible for local images meta-data and download all images of a gallery
 WebDAVService webdavService = WebDAVService();
@@ -53,7 +53,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
       await webdavClient?.mkdir('/JHentaiData');
       
-      final directory =await getApplicationDocumentsDirectory();
+      final directory =pathService.getVisibleDir();
       log.info(directory.path);
       webdavCachePath = '${directory.path}/cache';
       webdavCacheJsonPath = '$webdavCachePath/${CloudConfigService.configFileName}-WebDAV.json';
@@ -102,10 +102,21 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     }catch(e){
       log.error("$e");
     }
-
-    await webdavDownloadData();
-    await webdavDownloadAllGalleries();
-    await webdavUploadAllGalleries();
+    try{
+      await webdavDownloadData();
+    }catch(e){
+      log.error("$e");
+    }
+    try{
+      await webdavDownloadAllGalleries();
+    }catch(e){
+      log.error("$e");
+    }
+    try{
+      await webdavUploadAllGalleries();
+    }catch(e){
+      log.error("$e");
+    }
   }
 
   Future<void> webdavDownloadAllGalleries() async {
@@ -132,11 +143,18 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
               if(path.basename(folder.path).startsWith(gidStr)){
                 String metadataPath=path.join(folder.path,'metadata');
                 io.File metadataFile=io.File(metadataPath);
+                if(!(await metadataFile.exists())){
+                  folder.delete();
+                  break;
+                }
                 String metadata=await metadataFile.readAsString();
                 Map<String, dynamic> metadataMap = jsonDecode(metadata);
                 if (metadataMap["gallery"]['downloadStatusIndex'] != 4) {
                   log.info('${path.basename(folder.path)} 未下载完成');
-                  folder.listSync().whereType<io.File>().forEach((file)async{await file.delete();});
+                  Iterable<io.File> files= folder.listSync().whereType<io.File>();
+                  for(var file in files){
+                    await file.delete();
+                  }
                   await folder.delete();
                 }
                 else{
@@ -162,7 +180,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
 
   Future<void> webdavDownloadGallery(int gid)async{
     try{
-      log.info('下载 $gid');
+      log.info('下载 $gid 到 $webdavCachePath/$gid.zip');
       String remotePath="$webdavRemotePath/download/$gid.zip";
       String zipPath='$webdavCachePath/$gid.zip';
       await webdavClient?.read2File(remotePath, zipPath);
@@ -225,14 +243,9 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         await webdavClient?.mkdir(webdavRemotePath);
         await _exportData();
         if(await io.File(webdavCacheJsonPath).exists()){
-          String zipJsonPath =webdavCacheJsonPath+".zip";
-          var encoder = ZipFileEncoder();
-          encoder.create(zipJsonPath);
-          encoder.addFile(io.File(webdavCacheJsonPath));
-          encoder.close();
+          
+          await _uploadFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json');
           await io.File(webdavCacheJsonPath).delete();
-          await _uploadFile(zipJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json.zip');
-          await io.File(zipJsonPath).delete();
         }
         log.info('导出到云端成功');
       } catch (e) {
@@ -244,13 +257,12 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     if(enable){
       try {
         await _createCache();
-        await webdavClient?.read2File('$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json.zip', webdavCacheJsonPath+'.zip');
-        await extractFileToDisk(webdavCacheJsonPath+'.zip', webdavCachePath);
-        io.File(webdavCacheJsonPath+'.zip').delete();
+        await webdavClient?.read2File('$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', webdavCacheJsonPath);
+        //io.File(webdavCacheJsonPath+'.zip').delete();
         if (await io.File(webdavCacheJsonPath).exists()) {
           await _importData();
         }
-        io.File(webdavCacheJsonPath).delete();
+        //io.File(webdavCacheJsonPath).delete();
         log.info('从云端导入成功');
       } catch (e) {
         log.error('$e');
@@ -307,6 +319,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     try {
       // 创建 FormData
       String fileName = io.File(filePath).uri.pathSegments.last; // 获取文件名
+
       FormData formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(filePath, filename: fileName), // 使用获取的文件名
       });
@@ -349,6 +362,21 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     try {
       io.File file = io.File(webdavCacheJsonPath);
       String string = await file.readAsString();
+      int startIndex=0;
+      int endIndex=string.length;
+      for(int i=0;i<string.length;i++){
+        if(string[i]=='['){
+          startIndex=i;
+          break;
+        }
+      }
+      for(int i=string.length-1;i>=0;i--){
+        if(string[i]==']'){
+          endIndex=i+1;
+          break;
+        }
+      }
+      string=string.substring(startIndex,endIndex);
       List list = await isolateService.jsonDecodeAsync(string);
       List<CloudConfig> configs = list.map((e) => CloudConfig.fromJson(e)).toList();
       for (CloudConfig config in configs) {
