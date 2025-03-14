@@ -131,7 +131,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         var folders = directory.listSync().whereType<io.Directory>();
         for (var zipFileCloud in cloudList) {
           try{
-            log.info(zipFileCloud.path??'');
+            log.info('检查是否需要下载'+(path.basename(zipFileCloud.path??'')));
             String gidStr = path.basename(zipFileCloud.path??'').split('.zip')[0];
             int gid = int.tryParse(gidStr) ?? -1;
             if(gid == -1){
