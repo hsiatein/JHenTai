@@ -8,6 +8,7 @@ import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_rx/get_rx.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 import 'package:get/get_utils/get_utils.dart';
+import 'package:jhentai/src/database/database.dart';
 
 import 'package:jhentai/src/setting/network_setting.dart';
 
@@ -29,6 +30,8 @@ import 'package:archive/archive_io.dart';
 import 'dart:convert';
 import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:http_parser/http_parser.dart';
+import 'dart:typed_data';
 
 /// Responsible for local images meta-data and download all images of a gallery
 WebDAVService webdavService = WebDAVService();
@@ -181,8 +184,9 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       String remotePath="$webdavRemotePath/download/$gid.zip";
       String zipPath='$webdavCachePath/$gid.zip';
       await webdavClient?.read2File(remotePath, zipPath);
+      await _cleanFile(zipPath);
       await extractFileToDisk(zipPath, downloadSetting.downloadPath.value);
-      io.File(zipPath).delete();
+      //io.File(zipPath).delete();
       galleryDownloadService.restoreTasks();
       log.info('下载 $gid 成功');
     }catch(e){
@@ -287,7 +291,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
           else{
             log.error('${zipFile.path} 不存在');
           }
-          await zipFile.delete();
+          //await zipFile.delete();
           break;
         }
 
@@ -296,6 +300,40 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         log.error('$e');
       }
     }
+  }
+
+  Future<void> _cleanFile(String filePath) async {
+    final file = io.File(filePath);
+    final bytes = await file.readAsBytes();
+
+    // 定义需要查找的字节序列
+    final List<int> targetStart = [0x50, 0x4b]; // ZIP 文件开头
+    final List<int> boundarySequence = [
+      0x0d, 0x0a, 0x0d, 0x0a, 0x50, 0x4b
+    ]; // 边界序列
+
+    final List<int> endSequence = [
+      0x0d, 0x0a, 0x2d, 0x2d, 0x2d, 0x2d
+    ]; // 结束序列
+
+    // 检查文件开头
+    if (bytes[0] == targetStart[0] && bytes[1] == targetStart[1]) {
+      return; // 文件以 50 4b 开头，不做处理
+    } else if (bytes[0] == 0x2d) {
+      // 文件以 2d 开头，进行处理
+      // 查找边界序列
+      final startIndex = _findSequenceIndex(bytes,boundarySequence)+4;
+      // 创建新的字节数组，从边界序列开始
+      final cleanedBytes = bytes.sublist(startIndex);
+      // 从后往前查找结束序列
+      final endIndex = _findSequenceIndex(cleanedBytes,endSequence,fromEnd: true);
+
+      // 创建最终的字节数组，去掉结束序列之前的内容
+      final finalBytes = cleanedBytes.sublist(0, endIndex).toList();
+
+      // 写回文件
+      await file.writeAsBytes(finalBytes);
+    } 
   }
 
   Future<void> _uploadFile(String filePath, String remotePath) async {
@@ -316,9 +354,15 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     try {
       // 创建 FormData
       String fileName = io.File(filePath).uri.pathSegments.last; // 获取文件名
-
+      MediaType mediaType;
+      if(fileName.endsWith('.zip')){
+        mediaType=MediaType('application', 'zip');
+      }
+      else{
+        mediaType=MediaType('application', 'json');
+      }
       FormData formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(filePath, filename: fileName), // 使用获取的文件名
+        'file': await MultipartFile.fromFile(filePath, filename: fileName,contentType: mediaType), // 使用获取的文件名
       });
       // 发送 PUT 请求
       Response response = await dio.put(url, data: formData);
@@ -466,4 +510,29 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       file.delete().ignore();
     }
   }
+
+  int _findSequenceIndex(Uint8List bytes, List<int> sequence, {bool fromEnd = false}) {
+    final sequenceLength = sequence.length;
+    for (int i = (fromEnd ? bytes.length - sequenceLength : 0);
+        fromEnd ? i >= 0 : i <= bytes.length - sequenceLength;
+        fromEnd ? i-- : i++) {
+      if (_listEqual(bytes.sublist(i, i + sequenceLength).toList(),sequence)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  bool _listEqual(List<int> a,List<int> b){
+    if (a.length != b.length){
+      return false;
+    }
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]){
+        return false;
+      }
+    }
+    return true;
+  }
+
 }
