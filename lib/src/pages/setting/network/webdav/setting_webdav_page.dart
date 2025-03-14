@@ -114,11 +114,11 @@ class _SettingWebDAVPageState extends State<SettingWebDAVPage> {
   Widget _buildSynchronizeNow() {
     return ListTile(
       title: Text('synchronizeNow'.tr),
-      onTap: () {
-        //webdavService.testSynchronize();
-        //log.info('测试同步');
-        //webdavService.webdavUploadAllGalleries();
-        webdavService.webdavDownloadAllGalleries();
+      onTap: () async {
+        await webdavService.testSynchronize();
+        log.info('测试同步');
+        await webdavService.webdavDownloadAllGalleries();
+        await webdavService.webdavUploadAllGalleries();
       },
     );
   }

@@ -28,6 +28,7 @@ import 'package:path/path.dart' as path;
 import 'package:archive/archive_io.dart';
 import 'dart:convert';
 import 'package:jhentai/src/service/gallery_download_service.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Responsible for local images meta-data and download all images of a gallery
 WebDAVService webdavService = WebDAVService();
@@ -51,7 +52,9 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       Get.put(this, permanent: true);
       webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
       await webdavClient?.mkdir('/JHentaiData');
-      final directory = io.Directory.current;
+      
+      final directory =await getApplicationDocumentsDirectory();
+      log.info(directory.path);
       webdavCachePath = '${directory.path}/cache';
       webdavCacheJsonPath = '$webdavCachePath/${CloudConfigService.configFileName}-WebDAV.json';
     }
@@ -69,14 +72,8 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         log.info(webdavClient?.auth.pwd??'');
         await webdavClient?.ping();
         log.info('ping 成功');
-        var list = await webdavClient?.readDir('/JHentaiData/');
-        list?.forEach((f) {
-          print('${f.path}');
-        });
-        toast('success'.tr);
       } catch (e) {
         log.info('$e');
-        toast('fail'.tr);
       }
     }
   }
@@ -86,8 +83,8 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       log.info('清除缓存');
       io.Directory cache=io.Directory(webdavCachePath);
       if(await cache.exists()){
-        Iterable<io.File> Files= cache.listSync().whereType<io.File>();
-        for(var file in Files){
+        Iterable<io.File> files= cache.listSync().whereType<io.File>();
+        for(var file in files){
           await file.delete();
         }
       }
@@ -139,6 +136,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
                 Map<String, dynamic> metadataMap = jsonDecode(metadata);
                 if (metadataMap["gallery"]['downloadStatusIndex'] != 4) {
                   log.info('${path.basename(folder.path)} 未下载完成');
+                  folder.listSync().whereType<io.File>().forEach((file)async{await file.delete();});
                   await folder.delete();
                 }
                 else{
@@ -229,6 +227,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         if(await io.File(webdavCacheJsonPath).exists()){
           await _uploadFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json');
         }
+        await io.File(webdavCacheJsonPath).delete();
         log.info('导出到云端成功');
       } catch (e) {
         log.error('$e');
