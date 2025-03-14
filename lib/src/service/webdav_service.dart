@@ -67,9 +67,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
   Future<void> testSynchronize() async {
     if(enable){
       try {
-        log.info(webdavClient?.uri??'');
-        log.info(webdavClient?.auth.user??'');
-        log.info(webdavClient?.auth.pwd??'');
         await webdavClient?.ping();
         log.info('ping 成功');
       } catch (e) {
