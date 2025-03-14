@@ -54,8 +54,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     if(enable){
       Get.put(this, permanent: true);
       webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
-      await webdavClient?.mkdir('/JHentaiData');
-      
       final directory =pathService.getVisibleDir();
       log.info(directory.path);
       webdavCachePath = '${directory.path}/cache';
@@ -92,6 +90,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         _createCache();
       }
       log.info('清除远程错误文件');
+      webdavClient?.mkdirAll('/JHentaiData/download');
       var cloudList = await webdavClient?.readDir('/JHentaiData/download');
       for(var file in cloudList!){
         if(file.path?.endsWith('.zip') ?? true){
