@@ -112,8 +112,7 @@ void main(List<String> args) async {
   for (JHLifeCircleBean bean in lifeCircleBeans) {
     await bean.initBean();
   }
-  webdavService.webdavDownloadData();
-  webdavService.webdavUploadAllGalleries();
+  webdavService.webdavInitProcess();
   runApp(const MyApp());
 }
 

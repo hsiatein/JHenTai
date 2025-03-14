@@ -26,6 +26,8 @@ import 'package:webdav_client/webdav_client.dart' as webdav_client;
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:path/path.dart' as path;
 import 'package:archive/archive_io.dart';
+import 'dart:convert';
+import 'package:jhentai/src/service/gallery_download_service.dart';
 
 /// Responsible for local images meta-data and download all images of a gallery
 WebDAVService webdavService = WebDAVService();
@@ -47,15 +49,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     enableGallery=networkSetting.enableWebDAVSynchronizeGallery.value;
     if(enable){
       Get.put(this, permanent: true);
-      webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '', debug:true);
-      // 设置公共请求头
-      webdavClient?.setHeaders({'accept-charset': 'utf-8'});
-      // 设置连接服务器超时时间（毫秒）
-      webdavClient?.setConnectTimeout(8000);
-      // 设置发送数据超时时间（毫秒）
-      webdavClient?.setSendTimeout(8000);
-      // 设置接收数据超时时间（毫秒）
-      webdavClient?.setReceiveTimeout(8000);
+      webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
       await webdavClient?.mkdir('/JHentaiData');
       final directory = io.Directory.current;
       webdavCachePath = '${directory.path}/cache';
@@ -74,6 +68,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         log.info(webdavClient?.auth.user??'');
         log.info(webdavClient?.auth.pwd??'');
         await webdavClient?.ping();
+        log.info('ping 成功');
         var list = await webdavClient?.readDir('/JHentaiData/');
         list?.forEach((f) {
           print('${f.path}');
@@ -86,34 +81,145 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     }
   }
 
+  Future<void> webdavInitProcess() async {
+    try{
+      log.info('清除缓存');
+      io.Directory cache=io.Directory(webdavCachePath);
+      if(await cache.exists()){
+        Iterable<io.File> Files= cache.listSync().whereType<io.File>();
+        for(var file in Files){
+          await file.delete();
+        }
+      }
+      else{
+        _createCache();
+      }
+      log.info('清除远程错误文件');
+      var cloudList = await webdavClient?.readDir('/JHentaiData/download');
+      for(var file in cloudList!){
+        if(file.path?.endsWith('.zip') ?? true){
+          continue;
+        }
+        await webdavClient?.remove(file.path!);
+      }
+    }catch(e){
+      log.error("$e");
+    }
+
+    await webdavDownloadData();
+    await webdavDownloadAllGalleries();
+    await webdavUploadAllGalleries();
+  }
+
+  Future<void> webdavDownloadAllGalleries() async {
+    if(enable && enableGallery){
+      try {
+        await webdavClient?.mkdir('$webdavRemotePath/download');
+        var cloudList = await webdavClient?.readDir('/JHentaiData/download');
+        if(cloudList==null){
+          return;
+        }
+        final directory = io.Directory(downloadSetting.downloadPath.value);
+        var folders = directory.listSync().whereType<io.Directory>();
+        for (var zipFileCloud in cloudList) {
+          try{
+            log.info(zipFileCloud.path??'');
+            String gidStr = path.basename(zipFileCloud.path??'').split('.zip')[0];
+            int gid = int.tryParse(gidStr) ?? -1;
+            if(gid == -1){
+              continue;
+            }
+            //log.info('查找 $gid');
+            bool needDownload=true;
+            for(var folder in folders){
+              if(path.basename(folder.path).startsWith(gidStr)){
+                String metadataPath=path.join(folder.path,'metadata');
+                io.File metadataFile=io.File(metadataPath);
+                String metadata=await metadataFile.readAsString();
+                Map<String, dynamic> metadataMap = jsonDecode(metadata);
+                if (metadataMap["gallery"]['downloadStatusIndex'] != 4) {
+                  log.info('${path.basename(folder.path)} 未下载完成');
+                  await folder.delete();
+                }
+                else{
+                  needDownload=false;
+                }
+                break;
+              }
+            }
+            if(needDownload){
+              await webdavDownloadGallery(gid);
+            }
+          }catch (e) {
+            log.error('$e');
+            continue;
+          }
+        }
+
+      } catch (e) {
+        log.error('$e');
+      }
+    }
+  }
+
+  Future<void> webdavDownloadGallery(int gid)async{
+    try{
+      log.info('下载 $gid');
+      String remotePath="$webdavRemotePath/download/$gid.zip";
+      String zipPath='$webdavCachePath/$gid.zip';
+      await webdavClient?.read2File(remotePath, zipPath);
+      await extractFileToDisk(zipPath, downloadSetting.downloadPath.value);
+      io.File(zipPath).delete();
+      galleryDownloadService.restoreTasks();
+      log.info('下载 $gid 成功');
+    }catch(e){
+      log.error('$e');
+    }
+  }
+
   Future<void> webdavUploadAllGalleries() async {
     if(enable && enableGallery){
       try {
         await webdavClient?.mkdir('$webdavRemotePath/download');
         var cloudList = await webdavClient?.readDir('/JHentaiData/download');
-        cloudList?.forEach((f) {
-          print('${f.path}');
-        });
         
         final directory = io.Directory(downloadSetting.downloadPath.value);
         var folders = directory.listSync().whereType<io.Directory>();
         for (var folder in folders) {
-          log.info(folder.path);
-          String gidStr = path.basename(folder.path).split(' - ')[0];
-          int gid = int.tryParse(gidStr) ?? -1;
-          if(gid == -1){
-            continue;
-          }
-          if (!(cloudList?.any((file) => path.basename(file.path ?? '').startsWith(gidStr)) ?? false)) {
+          try{
+            log.info(folder.path);
+            String gidStr = path.basename(folder.path).split(' - ')[0];
+            int gid = int.tryParse(gidStr) ?? -1;
+            if(gid == -1){
+              continue;
+            }
+            if (cloudList?.any((file) => path.basename(file.path ?? '').startsWith(gidStr)) ?? false) {
+              log.info('${path.basename(folder.path)} 已经存在');
+              continue;
+            }
+            String metadataPath=path.join(folder.path,'metadata');
+            io.File metadataFile=io.File(metadataPath);
+            String metadata=await metadataFile.readAsString();
+            Map<String, dynamic> metadataMap = jsonDecode(metadata);
+            if (metadataMap["gallery"]['downloadStatusIndex'] != 4) {
+              log.info('${path.basename(folder.path)} 未下载完成');
+              continue;
+            }
+            log.info('开始上传 ${path.basename(folder.path)}');
             await webdavUploadGallery(gid);
+          }catch (e) {
+            log.error('$e');
+            continue;
           }
         }
 
       } catch (e) {
-        log.info('$e');
+        log.error('$e');
       }
     }
   }
+
+
 
   Future<void> webdavUploadData() async {
     if(enable){
@@ -121,11 +227,11 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         await webdavClient?.mkdir(webdavRemotePath);
         await _exportData();
         if(await io.File(webdavCacheJsonPath).exists()){
-          await webdavClient?.writeFromFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json', cancelToken:CancelToken());
+          await _uploadFile(webdavCacheJsonPath, '$webdavRemotePath/${CloudConfigService.configFileName}-WebDAV.json');
         }
         log.info('导出到云端成功');
       } catch (e) {
-        log.info('$e');
+        log.error('$e');
       }
     }
   }
@@ -139,7 +245,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         }
         log.info('从云端导入成功');
       } catch (e) {
-        log.info('$e');
+        log.error('$e');
       }
     }
   }
@@ -152,33 +258,66 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         final directory = io.Directory(downloadSetting.downloadPath.value);
         var folders = directory.listSync().whereType<io.Directory>();
         for (var folder in folders) {
-          if (path.basename(folder.path).startsWith('$gid - ')) {
-            await _zipFolder(folder.path,'$gid');
-            var zipFile=io.File('${downloadSetting.downloadPath.value}/$gid.zip');
-            log.info('打包为 ${zipFile.path}');
-            if(await zipFile.exists()){
-              CancelToken c = CancelToken();
-              await webdavClient?.writeFromFile(zipFile.path, '$webdavRemotePath/download/${path.basename(zipFile.path)}',onProgress: (c, t) {log.info(c / t);}, cancelToken: c);
-            }
-            else{
-              log.info('${zipFile.path} 不存在');
-            }
-            await zipFile.delete();
-            break;
+          if (!(path.basename(folder.path).startsWith('$gid - '))) {
+            continue;
           }
+          await _zipFolder(folder.path,'$gid');
+          var zipFile=io.File('$webdavCachePath/$gid.zip');
+          log.info('打包为 ${zipFile.path}');
+          if(await zipFile.exists()){
+            await _uploadFile(zipFile.path, '$webdavRemotePath/download/${path.basename(zipFile.path)}');
+          }
+          else{
+            log.error('${zipFile.path} 不存在');
+          }
+          await zipFile.delete();
+          break;
         }
 
         log.info('画廊 $gid 导出到云端成功');
       } catch (e) {
-        log.info('$e');
+        log.error('$e');
       }
     }
   }
 
+  Future<void> _uploadFile(String filePath, String remotePath) async {
+    String? url=webdavClient?.uri;
+    if(url==null){
+      return;
+    }
+    if(url.endsWith('/')){
+      url=url.substring(0,url.length-1);
+    }
+    url=url+remotePath;
+    String username=webdavClient?.auth.user ?? '';
+    String password=webdavClient?.auth.pwd ?? '';
+    Dio dio = Dio();
+    // 设置基本认证
+    String basicAuth = 'Basic ${base64Encode(utf8.encode('$username:$password'))}';
+    dio.options.headers['Authorization'] = basicAuth;
+    try {
+      // 创建 FormData
+      String fileName = io.File(filePath).uri.pathSegments.last; // 获取文件名
+      FormData formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: fileName), // 使用获取的文件名
+      });
+      // 发送 PUT 请求
+      Response response = await dio.put(url, data: formData);
+      // 检查响应状态
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        log.info('文件上传成功！');
+      } else {
+        log.error('上传失败: ${response.statusCode} - ${response.data}');
+      }
+    } catch (e) {
+      log.error('发生错误: $e');
+    }
+  }
 
 
   Future<void> _zipFolder(String folderPath,String zipName) async {
-    var zipFilePath = '${io.File(folderPath).parent.path}/$zipName.zip';
+    var zipFilePath = '$webdavCachePath/$zipName.zip';
     if (await io.File(zipFilePath).exists()) {
       return;
     }
@@ -210,7 +349,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       _importDataLoadingState = false;
     } catch (e, s) {
       log.error('Import data failed', e, s);
-      log.info('internalError'.tr);
       _importDataLoadingState = false;
       return;
     }
@@ -257,7 +395,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       }
     } on Exception catch (e) {
       log.error('Export data failed', e);
-      log.info('internalError'.tr);
       _exportDataLoadingState = false;
     }
   }
@@ -271,7 +408,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       await _createCache();
     } on Exception catch (e) {
       log.error('Select save path for exporting data failed', e);
-      log.info('internalError'.tr);
       _exportDataLoadingState = false;
       return;
     }
@@ -293,7 +429,6 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       _exportDataLoadingState = false;
     } on Exception catch (e) {
       log.error('Export data failed', e);
-      log.info('internalError'.tr);
       _exportDataLoadingState = false;
       file.delete().ignore();
     }
