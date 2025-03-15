@@ -20,6 +20,7 @@ import '../../../../utils/toast_util.dart';
 import '../../../../widget/eh_alert_dialog.dart';
 import '../../../../widget/eh_download_dialog.dart';
 import '../basic/multi_select/multi_select_download_page_logic_mixin.dart';
+import '../../../../service/log.dart';
 
 mixin GalleryDownloadPageLogicMixin on GetxController implements Scroll2TopLogicMixin, MultiSelectDownloadPageLogicMixin<GalleryDownloadedData> {
   final String bodyId = 'bodyId';
@@ -141,6 +142,10 @@ mixin GalleryDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
       String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: gallery.gid.toString());
       int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
 
+      if(galleryDownloadService.galleryDownloadInfos[gallery.gid]?.downloadProgress.downloadStatus==DownloadStatus.downloading){
+        galleryDownloadService.assignPriority(gallery, 1);
+      }
+      // try{
       toRoute(
         Routes.read,
         arguments: ReadPageInfo(
@@ -155,6 +160,9 @@ mixin GalleryDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
           useSuperResolution: superResolutionService.get(gallery.gid, SuperResolutionType.gallery) != null,
         ),
       );
+      // }catch(e){
+      //   log.error('$e');
+      // }
     }
   }
 

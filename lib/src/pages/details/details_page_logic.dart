@@ -1016,6 +1016,10 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
       return;
     }
 
+    if(galleryDownloadService.galleryDownloadInfos[gallery.gid]?.downloadProgress.downloadStatus==DownloadStatus.downloading){
+      galleryDownloadService.assignPriority(gallery, 1);
+    }
+    
     toRoute(
       Routes.read,
       arguments: ReadPageInfo(
