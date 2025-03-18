@@ -38,6 +38,7 @@ import '../../utils/eh_spider_parser.dart';
 import '../../service/log.dart';
 import '../../widget/auto_mode_interval_dialog.dart';
 import '../../widget/loading_state_indicator.dart';
+import '../../service/gallery_download_service.dart';
 
 
 class ReadPageLogic extends GetxController {
@@ -220,6 +221,16 @@ class ReadPageLogic extends GetxController {
     executor.close();
 
     WakelockPlus.disable();
+
+    int? gid=state.readPageInfo.gid;
+    if(gid!=null){
+      for(var gallery in galleryDownloadService.gallerys){
+        if(gallery.gid==gid){
+          galleryDownloadService.assignPriority(gallery, 4);
+          break;
+        }
+      }
+    }
   }
 
   void beginToParseImageHref(int index) {

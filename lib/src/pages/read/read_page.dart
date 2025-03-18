@@ -61,18 +61,18 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
   @override
   Widget build(BuildContext context) {
     
-    void finishRead(){
-      int? gid=state.readPageInfo.gid;
-      if(gid!=null){
-        for(var gallery in galleryDownloadService.gallerys){
-          if(gallery.gid==gid){
-            galleryDownloadService.assignPriority(gallery, 4);
-            break;
-          }
-        }
-      }
-      backRoute();
-    }
+    // void finishRead(){
+    //   int? gid=state.readPageInfo.gid;
+    //   if(gid!=null){
+    //     for(var gallery in galleryDownloadService.gallerys){
+    //       if(gallery.gid==gid){
+    //         galleryDownloadService.assignPriority(gallery, 4);
+    //         break;
+    //       }
+    //     }
+    //   }
+    //   backRoute();
+    // }
     Widget child = AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         systemNavigationBarColor: Colors.transparent,
@@ -83,10 +83,10 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         statusBarBrightness: Brightness.dark,
       ),
       child: EHMouseButtonListener(
-        onFifthButtonTapDown: (_) => finishRead(),
+        onFifthButtonTapDown: (_) => backRoute(),
         child: EHKeyboardListener(
           focusNode: state.focusNode,
-          handleEsc: finishRead,
+          handleEsc: backRoute,
           handleSpace: logic.toggleMenu,
           handlePageDown: logic.toNext,
           handlePageUp: logic.toPrev,
@@ -97,7 +97,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
           handleA: logic.toLeft,
           handleD: logic.toRight,
           handleM: logic.handleM,
-          handleEnd: finishRead,
+          handleEnd: backRoute,
           handleF11: toggleFullScreen,
           child: DefaultTextStyle(
             style: DefaultTextStyle.of(context).style.copyWith(
