@@ -247,67 +247,7 @@ jobs:
         with:
           tag: ${{ github.ref_name }}
           allowUpdates: true
-          bodyFile: changelog/${{ github.ref_name }}.md
+          body: "见源仓库"
           artifacts: /tmp/artifacts/release-Android/*.apk,/tmp/artifacts/release-iOS/*.ipa,/tmp/artifacts/release-macOS/*.dmg,/tmp/artifacts/release-Windows/*.zip,/tmp/artifacts/release-Linux-x64-deb/*.deb,/tmp/artifacts/release-Linux-arm64-deb/*.deb
           artifactErrorsFailBuild: true
           replacesArtifacts: true
-
-      # Get IPA file size
-      - name: Get IPA file size
-        id: get_ipa_size
-        run: |
-          IPA_SIZE=$(stat -c %s /tmp/artifacts/release-iOS/*.ipa)
-          echo "ipa_size=$IPA_SIZE" >> $GITHUB_OUTPUT
-
-      # Get changelog content
-      - name: Get changelog content
-        id: get_changelog
-        run: |
-          # Read changelog and preserve newlines for JSON
-          CHANGELOG=$(cat changelog/${{ github.ref_name }}.md | jq -Rs .)
-          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
-
-      # Extract build version from tag
-      - name: Get build version
-        id: get_build_version
-        run: |
-          BUILD_VERSION=$(echo "${{ github.ref_name }}" | grep -oE '\+[0-9]+' | tr -d '+')
-          echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
-
-      # Update AltSource.json
-      - name: Update AltSource.json
-        run: |
-          FULL_VERSION="${{ needs.Build.outputs.version }}"
-          # Remove build number part (content after +)
-          VERSION="${FULL_VERSION%%+*}"
-          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
-          # Get changelog as raw string (remove quotes added by jq -Rs)
-          CHANGELOG=${{ steps.get_changelog.outputs.changelog }}
-          
-          # Create new version entry
-          jq --arg version "$VERSION" \
-             --arg build "${{ steps.get_build_version.outputs.build_version }}" \
-             --arg date "$DATE" \
-             --arg desc "$CHANGELOG" \
-             --arg url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/JHenTai_${FULL_VERSION}.ipa" \
-             --arg size "${{ steps.get_ipa_size.outputs.ipa_size }}" \
-             '.apps[0].versions[0] = {
-                "version": $version,
-                "buildVersion": $build,
-                "date": $date,
-                "localizedDescription": $desc,
-                "downloadURL": $url,
-                "size": ($size | tonumber)
-              }' altsource/AltSource.json > altsource/AltSource.json.tmp
-          mv altsource/AltSource.json.tmp altsource/AltSource.json
-
-      # Commit and push updated AltSource.json
-      - name: Commit changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add altsource/AltSource.json
-          git commit -m "Update AltSource.json for version ${{ needs.Build.outputs.version }}"
-          git push origin HEAD:master
-
