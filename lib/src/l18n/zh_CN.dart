@@ -16,7 +16,7 @@ class zh_CN {
       'noMoreData': '到底啦',
       'noData': '无查询数据',
       'operationFailed': '操作失败',
-      'needLoginToOperate': '需要登陆后才能操作',
+      'needLoginToOperate': '需要登录后才能操作',
       'hasCopiedToClipboard': "已复制到粘贴板",
       'networkError': "网络错误，点击重试",
       'systemError': "系统错误",
@@ -63,15 +63,17 @@ class zh_CN {
       'logout': '注销',
       'passwordLogin': '密码登录',
       'cookieLogin': 'cookie登录',
+      'useWebview': 'Webview',
+      'skipCookieVerification': '跳过验证',
       'youHaveLoggedInAs': '您已登录:   ',
       'cookieIsBlack': 'cookie为空',
       'cookieFormatError': 'cookie格式错误',
-      'invalidCookie': '登陆失败或Cookie无效',
-      'loginFail': '登陆失败',
+      'invalidCookie': '登录失败或Cookie无效',
+      'loginFail': '登录失败',
       'userName': '用户名',
       'EHUser': 'E站用户',
       'password': '密码',
-      'needCaptcha': '触发人机验证。请另外选择cookie登陆或Web登陆。',
+      'needCaptcha': '触发人机验证。请另外选择cookie登录或Web登录。',
       'userNameOrPasswordMismatch': '用户名或密码错误',
       'copyCookies': '复制Cookies',
       'tap2Copy': '点击复制',
@@ -124,6 +126,7 @@ class zh_CN {
       'noComments': '暂无评论',
       'lastEditedOn': '最后修改于',
       'getGalleryDetailFailed': '获取画廊详情失败',
+      'cloudflare403': '你已被cloudflare限制网络请求，请尝试切换网络或使用其他登录方式。',
       'invisible2User': '此画廊对您不可见',
       'invisibleHints': '画廊已被删除或对您进行了限制',
       'copyRightHints': '该画廊因为版权已被删除，版权作者：',
@@ -179,6 +182,7 @@ class zh_CN {
       'addTagFailed': '添加标签失败',
       'parentGallery': '父画廊',
       'blockUploaderLocally': '本地屏蔽上传者',
+      'block': '屏蔽',
 
       /// detail dialog
       'galleryUrl': '画廊链接',
@@ -258,7 +262,7 @@ class zh_CN {
       'showCookie': '查看 Cookie',
       'redirect2EH': '画廊链接重定向至表站(如果可用)',
       'redirect2Hints': '会先尝试解析表站',
-      'pleaseLogInToOperate': '请登陆后操作',
+      'pleaseLogInToOperate': '请登录后操作',
       'imageLimits': '图片配额',
       'resetCost': '长按重置，花费',
       'assets': '资产',
@@ -580,6 +584,7 @@ class zh_CN {
       'multiReDownloadHint': '你将会重新下载所有选中的画廊。',
       'multiChangeGroupHint': '你将会改变所有选中画廊的分组。',
       'multiDeleteHint': '你将会删除所有选中的画廊。',
+      'blankImageHint': '下载图片返回空结果，尝试重新解析。',
       'peakHoursHint': '高峰段下载原图需要耗费GP，由于你的GP不足，下载已自动停止。',
       'oldGalleryHint': '部分画廊下载原图需要耗费GP，由于你的GP不足，下载已自动停止。',
       'exceedLimitHint': '图片配额已耗尽，由于你的GP不足，下载已自动停止。',
@@ -717,6 +722,37 @@ favnote：匹配收藏备注
       'restoreTasksAutomaticallyHint': '应用每次启动时尝试恢复下载任务',
       'brokenDownloadPathHint': '似乎你的下载路径已经损坏，下载功能可能失效',
       'brokenExtraScanPathHint': '似乎你的默认本地画廊路径已经损坏，本地画廊可能无法被识别',
+      'useJH2UpdateGallery': '使用JH服务器加速画廊更新',
+
+      /// archive bot settings
+      'archiveBotSettings': '归档机器人设置',
+      'archiveBotSettingsHint': '使用归档机器人免费获取归档链接',
+      'apiSetting': 'API设置',
+      'apiAddress': '地址',
+      'apiKey': 'Key',
+      'apiKeyHint': '填写您从 Telegram 机器人获取的密钥',
+      'dailyCheckin': '日常签到',
+      'currentBalance': '当前GP余额',
+      'checkBalanceFailed': '获取GP余额失败',
+      'checkInFailed': '签到失败',
+      'checkInSuccess': '签到成功',
+      'checkInSuccessHint': '获得GP：%s，当前总GP：%s。',
+      'pauseDownloadByInvalidArchiveBotKey': '归档Bot设置无效，下载已暂停',
+      'chooseArchiveParseSource': '修改解析来源',
+      'official': '官方',
+      'archiveBot': '归档机器人',
+      'changeParseSource2Official': '修改解析来源为官方',
+      'changeParseSource2Bot': '修改解析来源为归档机器人',
+      'invalidParam': '无效参数',
+      'invalidApiKey': '无效的 API Key',
+      'banned': '您已被封禁',
+      'fetchGalleryInfoFailed': '获取画廊信息失败',
+      'insufficientGP': 'GP不足',
+      'parseFailed': '解析失败',
+      'checkedIn': '今日已签到',
+      'serverError': '归档机器人内部错误',
+      'useProxyServer': '使用JHenTai代理服务器',
+      'useProxyServerHint': '通过JHenTai服务器中转请求',
 
       /// password setting dialog
       'setPasswordHint': '请输入您的密码',
@@ -772,7 +808,7 @@ favnote：匹配收藏备注
     注意1：不同规则之间是||的关系，同一规则下所有子规则之间是&&的关系。
     注意2：屏蔽属性为标签时，规则会对画廊的每一个标签均进行校验，表达式针对单个标签进行编写即可。
     注意3：屏蔽属性为标签时，如果你使用'='规则，你必须准确填写带命名空间的完整标签。   
-    注意4：在E站官方设置中，你需要使用能够展示所有标签的画廊布局如Extended，否则部分画廊可能不会被正确过滤
+    注意4：在E站官方设置中，你需要使用能够展示所有标签的画廊布局如Extended，否则部分画廊可能不会被正确过滤。
     
     示例1：屏蔽有男同标签且无伪娘标签的画廊————画廊标签包含male:yaoi && 画廊标签不包含male:tomgirl
     示例2：屏蔽评分不超过10分的评论————评论评分<=10
@@ -792,7 +828,7 @@ favnote：匹配收藏备注
       'warningImageHint': 'R18G图片，点击以显示',
 
       /// tagSet dialog
-      'chooseTagSet': '选择收藏标签集',
+      'chooseTagSet': '选择标签集',
 
       /// tag namespace
       'language': '语言',

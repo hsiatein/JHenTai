@@ -18,6 +18,7 @@ import 'package:jhentai/src/service/local_block_rule_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/local_gallery_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/schedule_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
@@ -29,6 +30,7 @@ import 'package:jhentai/src/service/volume_service.dart';
 import 'package:jhentai/src/service/webdav_service.dart';
 import 'package:jhentai/src/service/windows_service.dart';
 import 'package:jhentai/src/setting/advanced_setting.dart';
+import 'package:jhentai/src/setting/archive_bot_setting.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 import 'package:jhentai/src/setting/favorite_setting.dart';
@@ -51,10 +53,12 @@ import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/service/log.dart';
 
 import 'config/theme_config.dart';
+import 'network/archive_bot_request.dart';
 
 List<JHLifeCircleBean> lifeCircleBeans = [
   ehRequest,
   jhRequest,
+  archiveBotRequest,
   appUpdateService,
   galleryDownloadService,
   archiveDownloadService,
@@ -65,6 +69,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   isolateService,
   localBlockRuleService,
   localConfigService,
+  readProgressService,
   log,
   pathService,
   quickSearchService,
@@ -78,6 +83,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   windowService,
   advancedSetting,
   downloadSetting,
+  archiveBotSetting,
   ehSetting,
   favoriteSetting,
   mouseSetting,

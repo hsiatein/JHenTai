@@ -278,6 +278,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         width: fullScreenWidth,
         child: AppBar(
           backgroundColor: UIConfig.readPageMenuColor,
+          title: Text(state.readPageInfo.galleryTitle, style: const TextStyle(color: UIConfig.readPageButtonColor)),
           leading: const BackButton(color: UIConfig.readPageButtonColor),
           actions: [
             if (GetPlatform.isDesktop)

@@ -1,16 +1,18 @@
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
-import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/mixin/scroll_to_top_logic_mixin.dart';
+import 'package:jhentai/src/mixin/update_global_gallery_status_logic_mixin.dart';
+import 'package:jhentai/src/setting/archive_bot_setting.dart';
+import 'package:jhentai/src/widget/eh_archive_parse_source_select_dialog.dart';
 
 import '../../../../database/database.dart';
 import '../../../../model/gallery_image.dart';
 import '../../../../model/read_page_info.dart';
 import '../../../../routes/routes.dart';
 import '../../../../service/archive_download_service.dart';
-import '../../../../service/local_config_service.dart';
+import '../../../../service/read_progress_service.dart';
 import '../../../../service/super_resolution_service.dart';
 import '../../../../setting/read_setting.dart';
 import '../../../../setting/super_resolution_setting.dart';
@@ -24,7 +26,8 @@ import '../basic/multi_select/multi_select_download_page_logic_mixin.dart';
 import '../basic/multi_select/multi_select_download_page_state_mixin.dart';
 import 'archive_download_page_state_mixin.dart';
 
-mixin ArchiveDownloadPageLogicMixin on GetxController implements Scroll2TopLogicMixin, MultiSelectDownloadPageLogicMixin<ArchiveDownloadedData> {
+mixin ArchiveDownloadPageLogicMixin on GetxController
+    implements Scroll2TopLogicMixin, MultiSelectDownloadPageLogicMixin<ArchiveDownloadedData>, UpdateGlobalGalleryStatusLogicMixin {
   final String bodyId = 'bodyId';
 
   ArchiveDownloadPageStateMixin get archiveDownloadPageState;
@@ -138,8 +141,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
     if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
       openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archive.title, archive.gid));
     } else {
-      String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: archive.gid.toString());
-      int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
+      int readIndexRecord = await readProgressService.getReadProgress(archive.gid);
 
       List<GalleryImage> images = await archiveDownloadService.getUnpackedImages(archive.gid);
 
@@ -162,6 +164,8 @@ mixin ArchiveDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
   }
 
   void showBottomSheet(ArchiveDownloadedData archive, BuildContext context) {
+    ArchiveDownloadInfo? archiveDownloadInfo = archiveDownloadService.archiveDownloadInfos[archive.gid];
+
     showCupertinoModalPopup(
       context: context,
       builder: (BuildContext context) => CupertinoActionSheet(
@@ -203,6 +207,27 @@ mixin ArchiveDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
                 superResolutionService.deleteSuperResolve(archive.gid, SuperResolutionType.archive).then((_) => toast("success".tr));
               },
             ),
+          if (archiveDownloadInfo != null &&
+              archiveDownloadInfo.archiveStatus.code < ArchiveStatus.downloaded.code &&
+              archiveDownloadInfo.parseSource == ArchiveParseSource.bot.code)
+            CupertinoActionSheetAction(
+              child: Text('changeParseSource2Official'.tr),
+              onPressed: () {
+                backRoute();
+                changeParseSource(archive.gid, ArchiveParseSource.official);
+              },
+            ),
+          if (archiveDownloadInfo != null &&
+              archiveDownloadInfo.archiveStatus.code < ArchiveStatus.downloaded.code &&
+              archiveBotSetting.isReady &&
+              archiveDownloadInfo.parseSource == ArchiveParseSource.official.code)
+            CupertinoActionSheetAction(
+              child: Text('changeParseSource2Bot'.tr),
+              onPressed: () {
+                backRoute();
+                changeParseSource(archive.gid, ArchiveParseSource.bot);
+              },
+            ),
           CupertinoActionSheetAction(
             child: Text('changeGroup'.tr),
             onPressed: () {
@@ -230,7 +255,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
     bool? ok = await Get.dialog(const ReUnlockDialog());
     if (ok ?? false) {
       await archiveDownloadService.cancelArchive(archive.gid);
-      await archiveDownloadService.downloadArchive(archive, resume: true);
+      await archiveDownloadService.downloadArchive(archive, resume: true, reParse: true);
     }
   }
 
@@ -279,11 +304,36 @@ mixin ArchiveDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
     );
 
     if (result == true) {
+      List<Future> futures = [];
+
       for (int gid in multiSelectDownloadPageState.selectedGids) {
-        archiveDownloadService.deleteArchive(gid);
+        futures.add(archiveDownloadService.deleteArchive(gid));
       }
 
       exitSelectMode();
+      
+      await Future.wait(futures);
+      updateGlobalGalleryStatus();
     }
+  }
+
+  Future<void> handleChangeParseSource() async {
+    ArchiveParseSource? result = await Get.dialog(const EHArchiveParseSourceSelectDialog());
+
+    if (result == null) {
+      return;
+    }
+
+    for (int gid in multiSelectDownloadPageState.selectedGids) {
+      await archiveDownloadService.changeParseSource(gid, result);
+    }
+
+    multiSelectDownloadPageState.inMultiSelectMode = false;
+    multiSelectDownloadPageState.selectedGids.clear();
+    updateSafely([bottomAppbarId, bodyId]);
+  }
+
+  Future<void> changeParseSource(int gid, ArchiveParseSource parseSource) async {
+    return archiveDownloadService.changeParseSource(gid, parseSource);
   }
 }

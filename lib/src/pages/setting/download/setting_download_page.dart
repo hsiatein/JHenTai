@@ -61,9 +61,11 @@ class _SettingDownloadPageState extends State<SettingDownloadPage> {
               _buildDownloadWithoutAsking(),
               _buildDefaultGalleryGroup(context),
               _buildDefaultArchiveGroup(context),
+              _buildArchiveBotSettings(),
               _buildDownloadConcurrency(),
               _buildSpeedLimit(context),
               _buildDownloadAllGallerysOfSamePriority(),
+              _buildUseJH2UpdateGallery(),
               _buildArchiveDownloadIsolateCount(),
               _buildManageArchiveDownloadConcurrency(),
               _buildDeleteArchiveFileAfterDownload(),
@@ -207,6 +209,15 @@ class _SettingDownloadPageState extends State<SettingDownloadPage> {
     );
   }
 
+  Widget _buildArchiveBotSettings() {
+    return ListTile(
+      title: Text('archiveBotSettings'.tr),
+      subtitle: Text('archiveBotSettingsHint'.tr),
+      trailing: const Icon(Icons.keyboard_arrow_right),
+      onTap: () => toRoute(Routes.archiveBotSettings),
+    );
+  }
+
   Widget _buildSpeedLimit(BuildContext context) {
     return ListTile(
       title: Text('speedLimit'.tr),
@@ -254,6 +265,14 @@ class _SettingDownloadPageState extends State<SettingDownloadPage> {
       subtitle: Text('${'downloadAllGallerysOfSamePriorityHint'.tr} | ${'needRestart'.tr}'),
       value: downloadSetting.downloadAllGallerysOfSamePriority.value,
       onChanged: downloadSetting.saveDownloadAllGallerysOfSamePriority,
+    );
+  }
+
+  Widget _buildUseJH2UpdateGallery() {
+    return SwitchListTile(
+      title: Text('useJH2UpdateGallery'.tr),
+      value: downloadSetting.useJH2UpdateGallery.value,
+      onChanged: downloadSetting.saveUseJH2UpdateGallery,
     );
   }
 

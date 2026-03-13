@@ -11,7 +11,6 @@ import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/database/dao/archive_dao.dart';
 import 'package:jhentai/src/database/dao/gallery_dao.dart';
 import 'package:jhentai/src/database/database.dart';
-import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/mixin/login_required_logic_mixin.dart';
@@ -23,7 +22,7 @@ import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
-import 'package:jhentai/src/service/local_config_service.dart';
+import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/my_tags_setting.dart';
@@ -646,7 +645,7 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
         return;
       }
 
-      ({bool isOriginal, int size, String group})? result = await Get.dialog(
+      ({bool useBot, bool isOriginal, int size, String group})? result = await Get.dialog(
         EHArchiveDialog(
           title: 'chooseArchive'.tr,
           archivePageUrl: state.galleryDetails!.archivePageUrl,
@@ -677,6 +676,7 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
         groupName: result.group,
         tags: state.galleryDetails != null ? tagMap2TagString(state.galleryDetails!.tags) : tagMap2TagString(state.gallery!.tags),
         tagRefreshTime: DateTime.now().toString(),
+        parseSource: result.useBot ? ArchiveParseSource.bot.code : ArchiveParseSource.official.code,
       );
       archiveDownloadService.downloadArchive(archive);
 
@@ -693,7 +693,7 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
       bool? ok = await showDialog(context: context, builder: (_) => const ReUnlockDialog());
       if (ok ?? false) {
         await archiveDownloadService.cancelArchive(archive.gid);
-        await archiveDownloadService.downloadArchive(archive, resume: true);
+        await archiveDownloadService.downloadArchive(archive, resume: true, reParse: true);
       }
       return;
     }
@@ -863,11 +863,11 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
     }
 
     if (downloadPageGalleryType == DownloadPageGalleryType.download) {
-      galleryDownloadService.deleteGalleryByGid(gid);
+      await galleryDownloadService.deleteGalleryByGid(gid);
     }
 
     if (downloadPageGalleryType == DownloadPageGalleryType.archive) {
-      archiveDownloadService.deleteArchive(gid);
+      await archiveDownloadService.deleteArchive(gid);
     }
 
     updateGlobalGalleryStatus();
@@ -988,6 +988,19 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
     toast('success'.tr);
   }
 
+  Future<void> blockGallery() async {
+    await localBlockRuleService.upsertBlockRule(
+      LocalBlockRule(
+        groupId: newUUID(),
+        target: LocalBlockTargetEnum.gallery,
+        attribute: LocalBlockAttributeEnum.gid,
+        pattern: LocalBlockPatternEnum.equal,
+        expression: state.galleryUrl.gid.toString(),
+      ),
+    );
+    toast('success'.tr);
+  }
+
   Future<void> goToReadPage([int? forceIndex]) async {
     /// online
     if (galleryDownloadService.galleryDownloadInfos[state.galleryUrl.gid]?.downloadProgress == null) {
@@ -1037,12 +1050,7 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
   }
 
   Future<int> getReadIndexRecord() async {
-    String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: state.galleryUrl.gid.toString());
-    if (string == null) {
-      return 0;
-    } else {
-      return int.tryParse(string) ?? 0;
-    }
+    return readProgressService.getReadProgress(state.galleryUrl.gid);
   }
 
   Future<({GalleryDetail galleryDetails, String apikey})> _getDetailsWithRedirectAndFallback({bool useCache = true}) async {

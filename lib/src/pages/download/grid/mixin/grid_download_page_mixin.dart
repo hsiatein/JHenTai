@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/string_extension.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
+import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/eh_image.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
@@ -12,6 +13,7 @@ import 'package:jhentai/src/service/super_resolution_service.dart';
 import '../../../../mixin/scroll_to_top_logic_mixin.dart';
 import '../../../../mixin/scroll_to_top_page_mixin.dart';
 import '../../../../mixin/scroll_to_top_state_mixin.dart';
+import '../../../../routes/routes.dart';
 import '../../../../setting/style_setting.dart';
 import '../../../layout/mobile_v2/notification/tap_menu_button_notification.dart';
 import '../../download_base_page.dart';
@@ -46,7 +48,16 @@ mixin GridBasePage on StatelessWidget implements Scroll2TopPageMixin {
     return AppBar(
       centerTitle: true,
       leading: styleSetting.isInV2Layout
-          ? IconButton(icon: const Icon(FontAwesomeIcons.bars, size: 20), onPressed: () => TapMenuButtonNotification().dispatch(context))
+          ? IconButton(
+              icon: isRouteAtTop(Routes.download) ? const Icon(Icons.arrow_back) : const Icon(FontAwesomeIcons.bars, size: 20),
+              onPressed: () {
+                if (isRouteAtTop(Routes.download)) {
+                  backRoute(currentRoute: Routes.download);
+                } else {
+                  TapMenuButtonNotification().dispatch(context);
+                }
+              },
+            )
           : null,
       titleSpacing: 0,
       title: DownloadPageSegmentControl(galleryType: galleryType),
@@ -160,10 +171,17 @@ mixin GridBasePage on StatelessWidget implements Scroll2TopPageMixin {
     );
 
     List<DraggableGridItem> galleryWidgets = state.currentGalleryObjects
-        .map((gallery) => DraggableGridItem(
-              child: galleryBuilder(context, gallery, state.inEditMode),
-              isDraggable: state.inEditMode,
-            ))
+        .map(
+          (gallery) => DraggableGridItem(
+            child: GetBuilder<GridBasePageLogic>(
+              global: false,
+              init: logic,
+              id: '${logic.galleryId}::${gallery.gid}',
+              builder: (_) => galleryBuilder(context, gallery, state.inEditMode),
+            ),
+            isDraggable: state.inEditMode,
+          ),
+        )
         .toList();
 
     return [returnWidget, ...galleryWidgets];
@@ -211,6 +229,7 @@ class ReturnWidget extends StatelessWidget {
 class GridGallery extends StatelessWidget {
   final String title;
   final Widget widget;
+  final bool parseFromBot;
   final bool isOriginal;
   final int? gid;
   final SuperResolutionType? superResolutionType;
@@ -224,6 +243,7 @@ class GridGallery extends StatelessWidget {
     Key? key,
     required this.title,
     required this.widget,
+    required this.parseFromBot,
     required this.isOriginal,
     this.gid,
     this.superResolutionType,
@@ -266,6 +286,17 @@ class GridGallery extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (parseFromBot)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              margin: const EdgeInsets.only(right: 4),
+              decoration: BoxDecoration(
+                color: UIConfig.backGroundColor(context),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: UIConfig.onBackGroundColor(context)),
+              ),
+              child: const Icon(Icons.smart_toy_outlined, size: UIConfig.downloadPageBotIconSize),
+            ),
           if (gid != null && superResolutionType != null)
             GetBuilder<SuperResolutionService>(
               id: '${SuperResolutionService.superResolutionId}::$gid',

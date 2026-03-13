@@ -40,6 +40,7 @@ import '../../widget/auto_mode_interval_dialog.dart';
 import '../../widget/loading_state_indicator.dart';
 import '../../service/gallery_download_service.dart';
 
+import '../../service/read_progress_service.dart';
 
 class ReadPageLogic extends GetxController {
   final String pageId = 'pageId';
@@ -623,10 +624,9 @@ class ReadPageLogic extends GetxController {
   }
 
   Future<void> _flushReadProgress() async {
-    await localConfigService.write(
-      configKey: ConfigEnum.readIndexRecord,
-      subConfigKey: state.readPageInfo.readProgressRecordStorageKey,
-      value: state.readPageInfo.currentImageIndex.toString(),
+    readProgressService.updateReadProgress(
+      state.readPageInfo.readProgressRecordStorageKey,
+      state.readPageInfo.currentImageIndex,
     );
   }
 

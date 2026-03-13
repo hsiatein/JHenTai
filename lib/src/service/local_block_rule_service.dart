@@ -28,6 +28,7 @@ class LocalBlockRuleService with JHLifeCircleBeanErrorCatch implements JHLifeCir
     handlers.addAll([
       GalleryTagEqualLocalBlockRuleHandler(),
       GalleryUploaderEqualLocalBlockRuleHandler(),
+      GalleryGidEqualLocalBlockRuleHandler(),
       CommentUsernameEqualLocalBlockRuleHandler(),
       CommentUserIdEqualLocalBlockRuleHandler(),
       CommentScoreGreaterThanLocalBlockRuleHandler(),
@@ -282,6 +283,17 @@ mixin GalleryUploaderAttributeGetter on AttributeGetter<String, Gallery> {
   }
 }
 
+mixin GalleryGidAttributeGetter on AttributeGetter<String, Gallery> {
+  @override
+  bool matchRuleAttribute(LocalBlockAttributeEnum attribute) {
+    return attribute == LocalBlockAttributeEnum.gid;
+  }
+
+  @override
+  List<String> getItemAttributes(covariant Gallery item) {
+    return [item.gid.toString()];
+  }
+}
 mixin CommentUsernameAttributeGetter on AttributeGetter<String, GalleryComment> {
   @override
   bool matchRuleAttribute(LocalBlockAttributeEnum attribute) {
@@ -527,6 +539,8 @@ class GalleryTagEqualLocalBlockRuleHandler extends EqualLocalBlockRuleHandler<Ga
 
 class GalleryUploaderEqualLocalBlockRuleHandler extends EqualLocalBlockRuleHandler<Gallery> with GalleryUploaderAttributeGetter {}
 
+class GalleryGidEqualLocalBlockRuleHandler extends EqualLocalBlockRuleHandler<Gallery> with GalleryGidAttributeGetter {}
+
 class CommentUsernameEqualLocalBlockRuleHandler extends EqualLocalBlockRuleHandler<GalleryComment> with CommentUsernameAttributeGetter {}
 
 class CommentUserIdEqualLocalBlockRuleHandler extends EqualLocalBlockRuleHandler<GalleryComment> with CommentUserIdAttributeGetter {}
@@ -587,6 +601,7 @@ enum LocalBlockAttributeEnum {
   title(0, LocalBlockTargetEnum.gallery, 'title'),
   tag(10, LocalBlockTargetEnum.gallery, 'tag'),
   uploader(20, LocalBlockTargetEnum.gallery, 'uploader'),
+  gid(30, LocalBlockTargetEnum.gallery, 'gid'),
   userName(100, LocalBlockTargetEnum.comment, 'userName'),
   userId(110, LocalBlockTargetEnum.comment, 'userId'),
   score(120, LocalBlockTargetEnum.comment, 'score'),
@@ -614,6 +629,7 @@ enum LocalBlockPatternEnum {
       LocalBlockAttributeEnum.uploader,
       LocalBlockAttributeEnum.userName,
       LocalBlockAttributeEnum.userId,
+      LocalBlockAttributeEnum.gid
     ],
     '=',
   ),

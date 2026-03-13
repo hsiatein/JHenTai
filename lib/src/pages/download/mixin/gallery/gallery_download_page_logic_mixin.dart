@@ -3,16 +3,15 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/mixin/scroll_to_top_logic_mixin.dart';
+import 'package:jhentai/src/mixin/update_global_gallery_status_logic_mixin.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
 
 import '../../../../database/database.dart';
-import '../../../../enum/config_enum.dart';
 import '../../../../model/read_page_info.dart';
 import '../../../../routes/routes.dart';
 import '../../../../service/gallery_download_service.dart';
-import '../../../../service/local_config_service.dart';
-import '../../../../service/storage_service.dart';
+import '../../../../service/read_progress_service.dart';
 import '../../../../setting/read_setting.dart';
 import '../../../../utils/process_util.dart';
 import '../../../../utils/route_util.dart';
@@ -22,7 +21,8 @@ import '../../../../widget/eh_download_dialog.dart';
 import '../basic/multi_select/multi_select_download_page_logic_mixin.dart';
 import '../../../../service/log.dart';
 
-mixin GalleryDownloadPageLogicMixin on GetxController implements Scroll2TopLogicMixin, MultiSelectDownloadPageLogicMixin<GalleryDownloadedData> {
+mixin GalleryDownloadPageLogicMixin on GetxController
+    implements Scroll2TopLogicMixin, MultiSelectDownloadPageLogicMixin<GalleryDownloadedData>, UpdateGlobalGalleryStatusLogicMixin {
   final String bodyId = 'bodyId';
 
   final GalleryDownloadService downloadService = galleryDownloadService;
@@ -139,8 +139,7 @@ mixin GalleryDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
     if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
       openThirdPartyViewer(downloadService.computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid));
     } else {
-      String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: gallery.gid.toString());
-      int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
+      int readIndexRecord = await readProgressService.getReadProgress(gallery.gid);
 
       if(galleryDownloadService.galleryDownloadInfos[gallery.gid]?.downloadProgress.downloadStatus==DownloadStatus.downloading){
         galleryDownloadService.assignPriority(gallery, 1);
@@ -363,11 +362,15 @@ mixin GalleryDownloadPageLogicMixin on GetxController implements Scroll2TopLogic
     );
 
     if (result == true) {
+      List<Future> futures = [];
+
       for (int gid in multiSelectDownloadPageState.selectedGids) {
-        downloadService.deleteGalleryByGid(gid);
+        futures.add(downloadService.deleteGalleryByGid(gid));
       }
 
       exitSelectMode();
+      await Future.wait(futures);
+      updateGlobalGalleryStatus();
     }
   }
 }

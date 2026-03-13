@@ -297,7 +297,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
   Future<void> requestLogout() async {
     await removeAllCookies();
     await userSetting.clearBeanConfig();
-    if (GetPlatform.isDesktop) {
+    if (GetPlatform.isWindows || GetPlatform.isLinux) {
       Directory directory = Directory(join(pathService.getVisibleDir().path, EHConsts.desktopWebviewDirectoryName));
       if (await directory.exists()) {
         await directory.delete(recursive: true);
@@ -1019,6 +1019,13 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
           shouldPauseAllDownloadTasks: false,
         );
       }
+    }
+    if (e.response?.statusCode == 403 && networkSetting.allHostAndIPs.contains(e.requestOptions.uri.host)) {
+      return EHSiteException(
+        type: EHSiteExceptionType.cloudflare,
+        message: 'cloudflare403'.tr,
+        shouldPauseAllDownloadTasks: false,
+      );
     }
 
     return e;

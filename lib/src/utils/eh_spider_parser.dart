@@ -34,6 +34,7 @@ import '../config/ui_config.dart';
 import '../consts/eh_consts.dart';
 import '../database/database.dart';
 import '../exception/eh_parse_exception.dart';
+import '../model/archive_unlock_result.dart';
 import '../model/detail_page_info.dart';
 import '../model/gallery.dart';
 import '../model/gallery_metadata.dart';
@@ -81,10 +82,6 @@ class EHSpiderParser {
       return _thumbnailGalleryPageDocument2GalleryListAndPageInfo(document);
     }
 
-    if (!html.contains('No hits found')) {
-      log.error('Parse gallery inline type failed');
-      log.uploadError(Exception('Parse gallery inline type failed'), extraInfos: {'html': html});
-    }
     return _compactGalleryPageDocument2GalleryPageInfo(document);
   }
 
@@ -488,7 +485,13 @@ class EHSpiderParser {
     }).toList();
   }
 
-  static Map<String, String?>? forumPage2UserInfo(Headers headers, dynamic data) {
+  static String? forumPage2UserName(Headers headers, dynamic data) {
+    Document document = parse(data as String);
+
+    return document.querySelector('.home > b > a')?.text;
+  }
+
+  static Map<String, String?>? profilePage2UserInfo(Headers headers, dynamic data) {
     Document document = parse(data as String);
 
     /// cookie is wrong, not logged in
@@ -849,10 +852,14 @@ class EHSpiderParser {
     return headers['Location']!.first;
   }
 
-  static String? unlockArchivePage2DownloadArchivePageUrl(Headers headers, dynamic data) {
-    Document document = parse(data as String);
+  static ArchiveUnlockResult unlockArchivePage2DownloadArchivePageUrl(Headers headers, dynamic data) {
+    String str = data as String;
+    if (str.startsWith('You do not have enough funds to download this archive. Obtain some Credits or GP and try again.')) {
+      return ArchiveUnlockResult(success: false, msg: str);
+    }
 
-    return document.querySelector('#continue > a')?.attributes['href'];
+    Document document = parse(str);
+    return ArchiveUnlockResult(success: true, msg: 'success', url: document.querySelector('#continue > a')?.attributes['href']);
   }
 
   static String downloadArchivePage2DownloadUrl(Headers headers, dynamic data) {

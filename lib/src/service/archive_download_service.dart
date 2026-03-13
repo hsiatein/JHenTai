@@ -15,11 +15,17 @@ import 'package:j_downloader/j_downloader.dart';
 import 'package:jhentai/src/database/dao/archive_group_dao.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/exception/eh_site_exception.dart';
+import 'package:jhentai/src/model/archive_bot_response/archive_bot_response.dart';
+import 'package:jhentai/src/model/archive_bot_response/archive_resolve_vo.dart';
+import 'package:jhentai/src/model/archive_unlock_result.dart';
+import 'package:jhentai/src/network/archive_bot_request.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
+import 'package:jhentai/src/setting/archive_bot_setting.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/network_setting.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/utils/archive_bot_response_parser.dart';
 import 'package:jhentai/src/utils/speed_computer.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:logger/logger.dart';
@@ -106,7 +112,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
     return archiveDownloadInfos.containsKey(gid);
   }
 
-  Future<void> downloadArchive(ArchiveDownloadedData archive, {bool resume = false}) async {
+  Future<void> downloadArchive(ArchiveDownloadedData archive, {bool resume = false, bool reParse = false}) async {
     await _ensureDownloadDirExists();
 
     if (!resume) {
@@ -120,7 +126,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       _generateComicInfoInDisk(archive);
     }
 
-    log.info('Begin to handle archive: ${archive.title}, original: ${archive.isOriginal}');
+    log.info('Begin to handle archive: ${archive.title}, original: ${archive.isOriginal}, parseSource: ${archive.parseSource}');
 
     /// step 1: request to unlock archive: if we have unlocked before or unlock has completed,
     /// we can get [downloadPageUrl] immediately, otherwise we must wait for a second
@@ -130,7 +136,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
     await _getDownloadPageUrl(archive);
 
     /// step 3: parse download url
-    await _getDownloadUrl(archive);
+    await _getDownloadUrl(archive, reParse: reParse);
 
     /// step 4: do download
     await _doDownloadArchiveViaMultiIsolate(archive);
@@ -227,23 +233,26 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       await _updateArchiveInDatabase(archive.gid);
       update(['$archiveStatusId::${archive.gid}']);
 
-      try {
-        await retry(
-          () => ehRequest.requestCancelArchive(
-            url: archive.archivePageUrl.replaceFirst('--', '-'),
-            cancelToken: archiveDownloadInfo.cancelToken,
-          ),
-          retryIf: (e) => e is DioException && e.type != DioExceptionType.cancel,
-          onRetry: (e) => log.download('Cancel archive: ${archive.title} failed, retry. Reason: ${(e as DioException).message}'),
-          maxAttempts: _maxRetryTimes,
-        );
-      } on DioException catch (e) {
-        if (e.type == DioExceptionType.cancel) {
-          return;
-        }
+      /// skip when use bot
+      if (archiveDownloadInfo.parseSource == ArchiveParseSource.official.code) {
+        try {
+          await retry(
+            () => ehRequest.requestCancelArchive(
+              url: archive.archivePageUrl.replaceFirst('--', '-'),
+              cancelToken: archiveDownloadInfo.cancelToken,
+            ),
+            retryIf: (e) => e is DioException && e.type != DioExceptionType.cancel,
+            onRetry: (e) => log.download('Cancel archive: ${archive.title} failed, retry. Reason: ${(e as DioException).message}'),
+            maxAttempts: _maxRetryTimes,
+          );
+        } on DioException catch (e) {
+          if (e.type == DioExceptionType.cancel) {
+            return;
+          }
 
-        log.download('Cancel archive error, reason: ${e.toString()}');
-        return pauseDownloadArchive(archive.gid);
+          log.download('Cancel archive error, reason: ${e.toString()}');
+          return pauseDownloadArchive(archive.gid);
+        }
       }
     }
   }
@@ -305,7 +314,14 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
 
     _sortArchives();
 
-    return _updateArchiveInDatabase(gid);
+    bool success = await _updateArchiveInDatabase(gid);
+    if (!success) {
+      return false;
+    }
+
+    _updateArchiveInfoInDisk(gid);
+
+    return true;
   }
 
   Future<void> renameGroup(String oldGroup, String newGroup) async {
@@ -325,6 +341,10 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
 
       await deleteGroup(oldGroup);
     });
+
+    for (ArchiveDownloadedData a in archiveDownloadedDatas) {
+      await _updateArchiveInfoInDisk(a.gid);
+    }
 
     _sortArchives();
   }
@@ -356,6 +376,26 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
     });
   }
 
+  Future<void> changeParseSource(int gid, ArchiveParseSource parseSource) async {
+    log.info('Update parse source: $gid $parseSource');
+
+    ArchiveDownloadInfo? archiveDownloadInfo = archiveDownloadInfos[gid];
+    if (archiveDownloadInfo == null) {
+      return;
+    }
+
+    if (archiveDownloadInfo.archiveStatus.code >= ArchiveStatus.downloaded.code) {
+      return;
+    }
+
+    archiveDownloadInfo.downloadUrl = null;
+    archiveDownloadInfo.parseSource = parseSource.code;
+
+    await _updateArchiveInDatabase(gid);
+
+    update(['$archiveStatusId::$gid']);
+  }
+
   Future<void> batchUpdateArchiveInDatabase(List<ArchiveDownloadedData> archives) async {
     await appDb.transaction(() async {
       for (ArchiveDownloadedData archive in archives) {
@@ -364,6 +404,10 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
     });
 
     _sortArchives();
+
+    for (ArchiveDownloadedData archive in archives) {
+      await _updateArchiveInfoInDisk(archive.gid);
+    }
   }
 
   /// Use meta in each archive folder to restore download tasks, then sync to database.
@@ -398,6 +442,9 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       }
       if (metadata['tagRefreshTime'] == null) {
         metadata['tagRefreshTime'] = DateTime.now().toString();
+      }
+      if (metadata['parseSource'] == null) {
+        metadata['parseSource'] = ArchiveParseSource.official.code;
       }
 
       ArchiveDownloadedData archive = ArchiveDownloadedData.fromJson(metadata as Map<String, dynamic>);
@@ -581,7 +628,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
     );
   }
 
-  Future<void> _check410Reason(String url, ArchiveDownloadedData archive) async {
+  Future<void> _check410Or404Reason(String url, ArchiveDownloadedData archive) async {
     try {
       await ehRequest.get(
         url: url,
@@ -592,7 +639,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
         return;
       }
 
-      if (e.response?.statusCode != 410) {
+      if (e.response?.statusCode != 410 && e.response?.statusCode != 404) {
         log.download('Check archive  ${archive.title} 410 reason failed, pause task.');
         return pauseDownloadArchive(archive.gid);
       }
@@ -617,9 +664,8 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
         log.download('Download archive 410, try re-parse. Archive: ${archive.title} Response: ${e.response!.data}');
 
         archiveDownloadInfos[archive.gid]!.downloadUrl = null;
-        await _updateArchiveStatus(archive.gid, ArchiveStatus.parsedDownloadPageUrl);
 
-        await _getDownloadUrl(archive);
+        await _getDownloadUrl(archive, reParse: true);
         return _doDownloadArchiveViaMultiIsolate(archive);
       }
     }
@@ -701,14 +747,18 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       archiveDownloadInfo.archiveStatus = ArchiveStatus.unlocked;
       return;
     }
+    if (archiveDownloadInfo.parseSource == ArchiveParseSource.bot.code) {
+      archiveDownloadInfo.archiveStatus = ArchiveStatus.unlocked;
+      return;
+    }
 
     log.download('Begin to unlock archive: ${archive.title}, original: ${archive.isOriginal}');
 
     await _updateArchiveStatus(archive.gid, ArchiveStatus.unlocking);
 
-    String? downloadPageUrl;
+    ArchiveUnlockResult result;
     try {
-      downloadPageUrl = await retry(
+      result = await retry(
         () => ehRequest.requestUnlockArchive(
           url: archive.archivePageUrl.replaceFirst('--', '-'),
           isOriginal: archive.isOriginal,
@@ -729,18 +779,21 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       snack('archiveError'.tr, e.message, isShort: true);
 
       if (e.shouldPauseAllDownloadTasks) {
-        return pauseAllDownloadArchive();
+        return await pauseAllDownloadArchive();
       } else {
-        return pauseDownloadArchive(archive.gid);
+        return await pauseDownloadArchive(archive.gid);
       }
     }
 
-    if (downloadPageUrl != null) {
+    if (result.success) {
       log.download('Get archive download page url success: ${archive.title}');
-      archiveDownloadInfo.downloadPageUrl = downloadPageUrl;
+      archiveDownloadInfo.downloadPageUrl = result.url;
+      await _updateArchiveStatus(archive.gid, ArchiveStatus.unlocked);
+    } else {
+      log.download('Unlock archive failed. Archive: ${archive.title}, reason: ${result.msg}');
+      snack('archiveError'.tr, result.msg, isShort: true);
+      await pauseDownloadArchive(archive.gid);
     }
-
-    await _updateArchiveStatus(archive.gid, ArchiveStatus.unlocked);
   }
 
   Future<void> _getDownloadPageUrl(ArchiveDownloadedData archive) async {
@@ -752,14 +805,18 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       archiveDownloadInfo.archiveStatus = ArchiveStatus.parsedDownloadPageUrl;
       return;
     }
+    if (archiveDownloadInfo.parseSource == ArchiveParseSource.bot.code) {
+      archiveDownloadInfo.archiveStatus = ArchiveStatus.parsedDownloadPageUrl;
+      return;
+    }
 
     log.download('Begin to circularly fetch archive download page url: ${archive.title}, original: ${archive.isOriginal}');
 
     await _updateArchiveStatus(archive.gid, ArchiveStatus.parsingDownloadPageUrl);
 
-    String? downloadPageUrl;
+    ArchiveUnlockResult result;
     try {
-      downloadPageUrl = await retry(
+      result = await retry(
         () => ehRequest.requestUnlockArchive(
           url: archive.archivePageUrl.replaceFirst('--', '-'),
           isOriginal: archive.isOriginal,
@@ -786,18 +843,23 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       }
     }
 
-    if (downloadPageUrl == null) {
+    if (result.success && result.url != null) {
+      log.download('Get archive download page url success: ${archive.title}');
+      archiveDownloadInfo.downloadPageUrl = result.url;
+      await _updateArchiveStatus(archive.gid, ArchiveStatus.parsedDownloadPageUrl);
+    } else if (result.success && result.url == null) {
       /// wait for server operation
       await Future.delayed(const Duration(milliseconds: 1000));
       return _getDownloadPageUrl(archive);
     } else {
-      log.download('Get archive download page url success: ${archive.title}');
-      archiveDownloadInfo.downloadPageUrl = downloadPageUrl;
-      await _updateArchiveStatus(archive.gid, ArchiveStatus.parsedDownloadPageUrl);
+      log.download('Get archive download page url failed. Archive: ${archive.title}, reason: ${result.msg}');
+      snack('archiveError'.tr, result.msg, isShort: true);
+      await pauseDownloadArchive(archive.gid);
+      return;
     }
   }
 
-  Future<void> _getDownloadUrl(ArchiveDownloadedData archive) async {
+  Future<void> _getDownloadUrl(ArchiveDownloadedData archive, {bool reParse = false}) async {
     ArchiveDownloadInfo archiveDownloadInfo = archiveDownloadInfos[archive.gid]!;
     if (!_isTaskInStatus(archive.gid, [ArchiveStatus.parsedDownloadPageUrl, ArchiveStatus.parsingDownloadUrl])) {
       return;
@@ -807,53 +869,107 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
       return;
     }
 
-    log.download('Begin to parse fetch archive download url: ${archive.title}, original: ${archive.isOriginal}');
+    /// changed parse source from bot to official
+    if (archiveDownloadInfo.parseSource == ArchiveParseSource.official.code && archiveDownloadInfo.downloadPageUrl == null) {
+      archiveDownloadInfo.archiveStatus = ArchiveStatus.unlocked;
+      return downloadArchive(archive);
+    }
+
+    log.download('Begin to parse fetch archive download url: ${archive.title}, original: ${archive.isOriginal}, parseSource: ${archive.parseSource}');
 
     await _updateArchiveStatus(archive.gid, ArchiveStatus.parsingDownloadUrl);
 
     String downloadPath;
-    try {
-      downloadPath = await retry(
-        () => ehRequest.get(
-          url: archiveDownloadInfo.downloadPageUrl!,
-          cancelToken: archiveDownloadInfo.cancelToken,
-          parser: EHSpiderParser.downloadArchivePage2DownloadUrl,
-        ),
-        retryIf: (e) => e is DioException && e.type != DioExceptionType.cancel,
-        onRetry: (e) => log.download('Parse archive download url: ${archive.title} failed, retry. Reason: ${(e as DioException).message}'),
-        maxAttempts: _maxRetryTimes,
-      );
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.cancel) {
-        return;
+
+    if (archiveDownloadInfo.parseSource == ArchiveParseSource.official.code) {
+      try {
+        downloadPath = await retry(
+          () => ehRequest.get(
+            url: archiveDownloadInfo.downloadPageUrl!,
+            cancelToken: archiveDownloadInfo.cancelToken,
+            parser: EHSpiderParser.downloadArchivePage2DownloadUrl,
+          ),
+          retryIf: (e) => e is DioException && e.type != DioExceptionType.cancel,
+          onRetry: (e) => log.download('Parse archive download url: ${archive.title} failed, retry. Reason: ${(e as DioException).message}'),
+          maxAttempts: _maxRetryTimes,
+        );
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          return;
+        }
+
+        return await _getDownloadUrl(archive);
+      } on EHSiteException catch (e) {
+        log.download('Download error, reason: ${e.message}');
+        snack('archiveError'.tr, e.message, isShort: true);
+
+        if (e.shouldPauseAllDownloadTasks) {
+          return pauseAllDownloadArchive();
+        } else {
+          return pauseDownloadArchive(archive.gid);
+        }
+      } catch (e) {
+        log.download('Parse archive download url error, reason: $e');
+        snack('archiveError'.tr, e.toString(), isShort: true);
+        return pauseDownloadArchive(archive.gid);
+      }
+    } else {
+      if (!archiveBotSetting.isReady) {
+        snack('archiveError'.tr, 'pauseDownloadByInvalidArchiveBotKey'.tr);
+        return pauseDownloadArchive(archive.gid);
       }
 
-      return await _getDownloadUrl(archive);
-    } on EHSiteException catch (e) {
-      log.download('Download error, reason: ${e.message}');
-      snack('archiveError'.tr, e.message, isShort: true);
+      try {
+        ArchiveBotResponse response = await retry(
+          () => archiveBotRequest.requestResolve(
+            apiAddress: archiveBotSetting.apiAddress.value,
+            apiKey: archiveBotSetting.apiKey.value!,
+            gid: archive.gid,
+            token: archive.token,
+            reParse: reParse,
+            cancelToken: archiveDownloadInfo.cancelToken,
+            parser: ArchiveBotResponseParser.commonParse,
+          ),
+          retryIf: (e) => e is DioException && e.type != DioExceptionType.cancel,
+          onRetry: (e) => log.download('Parse archive download url: ${archive.title} failed, retry. Reason: ${(e as DioException).message}'),
+          maxAttempts: _maxRetryTimes,
+        );
+        log.download('Parse archive download url via bot, response: $response');
 
-      if (e.shouldPauseAllDownloadTasks) {
-        return pauseAllDownloadArchive();
-      } else {
+        if (response.isSuccess) {
+          ArchiveResolveVO archiveResolveVO = ArchiveResolveVO.fromResponse(response.data);
+          downloadPath = archiveResolveVO.url;
+        } else {
+          snack('archiveError'.tr, response.errorMessage);
+          return pauseDownloadArchive(archive.gid);
+        }
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          return;
+        }
+
+        return await _getDownloadUrl(archive);
+      } catch (e) {
+        log.download('Parse archive download url error, reason: $e');
+        snack('archiveError'.tr, e.toString(), isShort: true);
         return pauseDownloadArchive(archive.gid);
       }
     }
 
-    /// sometimes the download url is invalid(the same as [downloadPageUrl]), retry
-    if (!downloadPath.endsWith('start=1')) {
-      log.warning('Failed to parse download url, retry: $downloadPath');
-      log.uploadError(
-        Exception('Failed to parse download url!'),
-        extraInfos: {
-          'downloadPath': downloadPath,
-          'archive': archiveDownloadInfo.toString(),
-        },
-      );
-      return _getDownloadUrl(archive);
+    /// add start=1
+    Uri uri = Uri.parse(downloadPath);
+    Map<String, String> queryParameters = Map.from(uri.queryParameters);
+    queryParameters.remove('autostart');
+    queryParameters.putIfAbsent('start', () => '1');
+    Uri replacedUri = uri.replace(queryParameters: queryParameters);
+    downloadPath = replacedUri.toString();
+
+    if (archiveDownloadInfo.parseSource == ArchiveParseSource.official.code) {
+      archiveDownloadInfo.downloadUrl = 'https://' + Uri.parse(archiveDownloadInfo.downloadPageUrl!).host + downloadPath;
+    } else {
+      archiveDownloadInfo.downloadUrl = downloadPath;
     }
 
-    archiveDownloadInfo.downloadUrl = 'https://' + Uri.parse(archiveDownloadInfo.downloadPageUrl!).host + downloadPath;
     log.trace('Parse archive download url success: ${archive.title}, original: ${archive.isOriginal}, url: ${archiveDownloadInfo.downloadUrl}');
     return _updateArchiveStatus(archive.gid, ArchiveStatus.parsedDownloadUrl);
   }
@@ -906,9 +1022,9 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
           DioException dioException = e.error;
           Response? response = dioException.response;
 
-          /// download too many bytes will cause 410
-          if (response?.statusCode == 410) {
-            return await _check410Reason(archiveDownloadInfos[archive.gid]!.downloadUrl!, archive);
+          /// download too many bytes will cause 410/404
+          if (response?.statusCode == 410 || response?.statusCode == 404) {
+            return await _check410Or404Reason(archiveDownloadInfos[archive.gid]!.downloadUrl!, archive);
           }
 
           /// too many download thread will cause 410
@@ -918,12 +1034,12 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
             return await pauseDownloadArchive(archive.gid);
           } else {
             log.download('Download archive failed: ${archive.title}, original: ${archive.isOriginal}, reason: $e');
-            snack('archiveError'.tr, e.error.toString(), isShort: true);
+            snack('archiveError'.tr, e.error?.toString() ?? e.type.desc, isShort: true);
             return pauseDownloadArchive(archive.gid);
           }
         } else {
           log.download('Download archive failed: ${archive.title}, original: ${archive.isOriginal}, reason: $e');
-          snack('archiveError'.tr, e.error.toString(), isShort: true);
+          snack('archiveError'.tr, e.error?.toString() ?? e.type.desc, isShort: true);
           return pauseDownloadArchive(archive.gid);
         }
       } on Exception catch (e) {
@@ -1034,6 +1150,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
               insertTime: archive.insertTime,
               tags: Value(archive.tags),
               tagRefreshTime: Value(archive.tagRefreshTime),
+              parseSource: Value(archive.parseSource),
             ),
           ) >
           0;
@@ -1071,6 +1188,7 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
 
     archiveDownloadInfos[archive.gid] = ArchiveDownloadInfo(
       size: archive.size,
+      parseSource: archive.parseSource,
       downloadPageUrl: archive.downloadPageUrl,
       downloadUrl: archive.downloadUrl,
       archiveStatus: ArchiveStatus.fromCode(archive.archiveStatusCode),
@@ -1115,6 +1233,21 @@ class ArchiveDownloadService extends GetxController with GridBasePageServiceMixi
     await file.writeAsString(jsonEncode(archive.toJson()));
   }
 
+  Future<void> _updateArchiveInfoInDisk(int gid) async {
+    ArchiveDownloadedData? archive = archives.firstWhereOrNull((a) => a.gid == gid);
+    ArchiveDownloadInfo? archiveDownloadInfo = archiveDownloadInfos[gid];
+    if (archive == null || archiveDownloadInfo == null) {
+      return;
+    }
+
+    ArchiveDownloadedData archiveWithUpdatedInfo = archive.copyWith(
+      sortOrder: archiveDownloadInfo.sortOrder,
+      groupName: archiveDownloadInfo.group,
+    );
+
+    return _saveArchiveInfoInDisk(archiveWithUpdatedInfo);
+  }
+
   Future<void> _deletePackingFileInDisk(ArchiveDownloadedData archive) async {
     File file = File(computePackingFileDownloadPath(archive));
     if (await file.exists()) {
@@ -1145,6 +1278,8 @@ class ArchiveDownloadInfo {
   /// Archive true size is different from which displayed in detail page
   int size;
 
+  int parseSource;
+
   String? downloadPageUrl;
 
   String? downloadUrl;
@@ -1165,6 +1300,7 @@ class ArchiveDownloadInfo {
 
   ArchiveDownloadInfo({
     required this.size,
+    required this.parseSource,
     this.downloadPageUrl,
     this.downloadUrl,
     required this.archiveStatus,
@@ -1178,7 +1314,7 @@ class ArchiveDownloadInfo {
 
   @override
   String toString() {
-    return 'ArchiveDownloadInfo{size: $size, downloadPageUrl: $downloadPageUrl, downloadUrl: $downloadUrl, archiveStatus: $archiveStatus, cancelToken: $cancelToken, speedComputer: $speedComputer, sortOrder: $sortOrder, group: $group}';
+    return 'ArchiveDownloadInfo{size: $size, parseSource: $parseSource, downloadPageUrl: $downloadPageUrl, downloadUrl: $downloadUrl, archiveStatus: $archiveStatus, cancelToken: $cancelToken, downloadTask: $downloadTask, downloadCompleter: $downloadCompleter, speedComputer: $speedComputer, sortOrder: $sortOrder, group: $group}';
   }
 }
 
@@ -1218,4 +1354,18 @@ enum OldArchiveStatus {
   downloaded,
   unpacking,
   completed,
+}
+
+enum ArchiveParseSource {
+  official(0),
+  bot(1),
+  ;
+
+  final int code;
+
+  const ArchiveParseSource(this.code);
+
+  factory ArchiveParseSource.fromCode(int code) {
+    return ArchiveParseSource.values.firstWhere((s) => s.code == code);
+  }
 }

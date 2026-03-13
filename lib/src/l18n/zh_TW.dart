@@ -63,6 +63,8 @@ class zh_TW {
       'logout': '登出',
       'passwordLogin': '密碼登入',
       'cookieLogin': 'cookie登入',
+      'useWebview': 'Webview',
+      'skipCookieVerification': '跳過驗證',
       'youHaveLoggedInAs': '您已登入:   ',
       'cookieIsBlack': 'cookie為空',
       'cookieFormatError': 'cookie格式錯誤',
@@ -124,6 +126,7 @@ class zh_TW {
       'noComments': '暫無評論',
       'lastEditedOn': '最後修改於',
       'getGalleryDetailFailed': '獲取畫廊詳情失敗',
+      'cloudflare403': '你已被 Cloudflare 限制網路請求，請嘗試切換網路或使用其他登入方式。',
       'invisible2User': '此畫廊對您不可見',
       'invisibleHints': '畫廊已被刪除或對您進行了限制',
       'copyRightHints': '該畫廊因為版權已被刪除，版權作者：',
@@ -179,6 +182,7 @@ class zh_TW {
       'addTagFailed': '新增標籤失敗',
       'parentGallery': '父畫廊',
       'blockUploaderLocally': '於本機端隱藏的上傳者',
+      'block': '隱藏',
 
       /// detail dialog
       'galleryUrl': '畫廊連結',
@@ -580,6 +584,7 @@ class zh_TW {
       'multiReDownloadHint': '你將會重新下載所有選中的畫廊。',
       'multiChangeGroupHint': '你將會改變所有選中畫廊的分組。',
       'multiDeleteHint': '你將會刪除所有選中的畫廊。',
+      'blankImageHint': '下載圖片返回空結果，嘗試重新解析。',
       'peakHoursHint': '尖峰時段下載原圖需要耗費GP，由於你的GP不足，下載已自動停止。',
       'oldGalleryHint': '部分畫廊下載原圖需要耗費GP，由於你的GP不足，下載已自動停止。',
       'exceedLimitHint': '圖片配額已耗盡，由於你的GP不足，下載已自動停止。',
@@ -717,6 +722,37 @@ favnote：配對收藏備註
       'restoreTasksAutomaticallyHint': '程式每次啟動時嘗試復原下載任務',
       'brokenDownloadPathHint': '你的下載路徑似乎已經損壞，下載功能可能失效',
       'brokenExtraScanPathHint': '你的預設本機畫廊路徑似乎已經損壞，本機畫廊可能無法被識別',
+      'useJH2UpdateGallery': '使用JH服務器加速畫廊更新',
+
+      /// archive bot settings
+      'archiveBotSettings': '歸檔機器人設定',
+      'archiveBotSettingsHint': '使用歸檔機器人免費獲取歸檔連結',
+      'apiSetting': 'API設置',
+      'apiAddress': '地址',
+      'apiKey': 'Key',
+      'apiKeyHint': '填寫您從 Telegram 機器人獲取的金鑰',
+      'dailyCheckin': '日常簽到',
+      'currentBalance': '目前 GP 餘額',
+      'checkBalanceFailed': '獲取 GP 餘額失敗',
+      'checkInFailed': '簽到失敗',
+      'checkInSuccess': '簽到成功',
+      'checkInSuccessHint': '獲得 GP：%s，目前總 GP：%s。',
+      'pauseDownloadByInvalidArchiveBotKey': '歸檔機器人設置無效，下載已暫停',
+      'chooseArchiveParseSource': '修改解析來源',
+      'official': '官方',
+      'archiveBot': '歸檔機器人',
+      'changeParseSource2Official': '修改解析來源為官方',
+      'changeParseSource2Bot': '修改解析來源為歸檔機器人',
+      'invalidParam': '無效參數',
+      'invalidApiKey': '無效的 API 金鑰',
+      'banned': '您已被封禁',
+      'fetchGalleryInfoFailed': '獲取畫廊資訊失敗',
+      'insufficientGP': 'GP 不足',
+      'parseFailed': '解析失敗',
+      'checkedIn': '今日已簽到',
+      'serverError': '歸檔機器人內部錯誤',
+      'useProxyServer': '使用JHenTai代理伺服器',
+      'useProxyServerHint': '通過JHenTai伺服器中轉請求',
 
       /// password setting dialog
       'setPasswordHint': '請輸入您的密碼',
@@ -745,8 +781,8 @@ favnote：配對收藏備註
       'removeBlockRuleFailed': '刪除隱藏規則失敗',
       'inputNumberHint': '請輸入正確的數字',
       'inputRegexHint': '請輸入合法的正規表示式',
-      'useBuiltInBlockedUsers': '使用內置用戶屏蔽名單',
-      'useBuiltInBlockedUsersHint': '過濾掉在名單中的用戶評論',
+      'useBuiltInBlockedUsers': '使用內建使用者封鎖名單',
+      'useBuiltInBlockedUsersHint': '過濾掉在名單中的使用者評論',
       'blockingRules': '隱藏規則',
       'blockingRulesHint': '針對畫廊和評論設定額外的隱藏規則',
       'blockingTarget': '隱藏目標',
@@ -772,8 +808,8 @@ favnote：配對收藏備註
     注意1：不同規則之間是||的關係，同一規則下所有子規則之間是&&的關係。
     注意2：隱藏屬性為標籤時，規則會對畫廊的每一個標籤均進行校驗，表達式針對單個標籤進行編寫即可。
     注意3：隱藏屬性為標籤時，如果你使用'='規則，你必須準確填寫帶命名空間的完整標籤。    
-    注意3：隱藏屬性為標籤時，如果你使用'='規則，你必須准確填寫帶命名空間的完整標簽。
-    註意4：在E站官方設置中，你需要使用能夠展示所有標簽的畫廊布局如Extended，否則部分畫廊可能不會被正確過濾
+    注意3：隱藏屬性為標籤時，如果你使用'='規則，你必須準確填寫帶命名空間的完整標籤。
+    注意4：在E站官方設定中，你需要使用能夠展示所有標籤的畫廊布局如Extended，否則部分畫廊可能不會被正確過濾
     
     範例1：隱藏有男同標籤且無偽娘標籤的畫廊————畫廊標籤包含male:yaoi && 畫廊標籤不包含male:tomgirl
     範例2：隱藏評分不超過10分的評論————評論評分<=10
@@ -793,7 +829,7 @@ favnote：配對收藏備註
       'warningImageHint': 'R18G圖片，點擊以顯示',
 
       /// tagSet dialog
-      'chooseTagSet': '選擇收藏標籤集',
+      'chooseTagSet': '選擇標籤集',
 
       /// tag namespace
       'language': '語言',

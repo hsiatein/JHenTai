@@ -75,6 +75,8 @@ class UIConfig {
     'reclass': Color(0xfff6dce9),
     'temp': Color(0xffe9dbfa),
     'other': Color(0xfffadcdb),
+    'location': Color(0xfff5dff5),
+    'default': Colors.white,
   };
 
   /// color for category tag
@@ -92,6 +94,8 @@ class UIConfig {
     '重新分类': Color(0xfff6dce9),
     '临时': Color(0xffe9dbfa),
     '其他': Color(0xfffadcdb),
+    '地点': Color(0xfff5dff5),
+    '默认': Colors.white,
   };
 
   /// raw tag color to tag index
@@ -189,6 +193,7 @@ class UIConfig {
   static const double galleryCardCoverWidthWithoutTags = 85;
   static const double galleryCardTitleSize = 15;
   static const double galleryCardTextSize = 12;
+  static const double galleryCardReadProgressIndicatorSize = 9;
 
   static Color galleryCardBackGroundColor(BuildContext context) => Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8);
 
@@ -328,6 +333,8 @@ class UIConfig {
   static Color downloadPageLoadingIndicatorColor(BuildContext context) => Theme.of(context).colorScheme.onSurfaceVariant;
 
   static Duration downloadPageAnimationDuration = const Duration(milliseconds: 300);
+
+  static const double downloadPageBotIconSize = 13;
 
   /// download page with gridview
   static Color downloadPageGridViewGroupBackGroundColor(BuildContext context) => Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.6);
@@ -548,6 +555,10 @@ class UIConfig {
   static const double archiveDialogCostTextSize = 10;
   static const double archiveDialogDownloadTextSize = 14;
   static const double archiveDialogDownloadIconSize = 16;
+
+  /// Archive parse source select dialog
+  static const double archiveParseSourceSelectDialogWidth = 230;
+  static const double archiveParseSourceSelectDialogHeight = 140;
 
   static Color archiveDialogCostTextColor(BuildContext context) => Theme.of(context).colorScheme.outline;
 

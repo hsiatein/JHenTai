@@ -5,6 +5,7 @@ import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/model/gallery_archive.dart';
+import 'package:jhentai/src/setting/archive_bot_setting.dart';
 import 'package:jhentai/src/widget/eh_asset.dart';
 import 'package:jhentai/src/widget/eh_group_name_selector.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
@@ -87,7 +88,7 @@ class _EHArchiveDialogState extends State<EHArchiveDialog> {
           text: 'resample'.tr,
           callback: _canAffordDownload(isOriginal: false)
               ? () => backRoute(
-                    result: (isOriginal: false, size: _computeSizeInBytes(isOriginal: false), group: group),
+                    result: (useBot: false, isOriginal: false, size: _computeSizeInBytes(isOriginal: false), group: group),
                   )
               : null,
         ),
@@ -97,10 +98,19 @@ class _EHArchiveDialogState extends State<EHArchiveDialog> {
           text: 'original'.tr,
           callback: _canAffordDownload(isOriginal: true)
               ? () => backRoute(
-                    result: (isOriginal: true, size: _computeSizeInBytes(isOriginal: true), group: group),
+                    result: (useBot: false, isOriginal: true, size: _computeSizeInBytes(isOriginal: true), group: group),
                   )
               : null,
         ),
+        if (archiveBotSetting.isReady)
+          _ArchiveButtonSet(
+            cost: 'Free!',
+            size: archive.originalSize,
+            icon: const Icon(Icons.smart_toy_outlined),
+            callback: () => backRoute(
+              result: (useBot: true, isOriginal: true, size: _computeSizeInBytes(isOriginal: true), group: group),
+            ),
+          ),
       ],
     );
   }
@@ -149,10 +159,9 @@ class _EHArchiveDialogState extends State<EHArchiveDialog> {
       if (archive.downloadOriginalHint.contains('Insufficient Funds')) {
         return false;
       }
-      if (archive.originalCost.contains('GP')) {
-        return (archive.gpCount ?? double.maxFinite) >= int.parse(archive.originalCost.split(' ')[0]);
-      }
-      return (archive.creditCount ?? double.maxFinite) >= int.parse(archive.originalCost.split(' ')[0]);
+
+      /// we can use credits to afford GP cost
+      return true;
     } else {
       if (archive.resampleCost == null || archive.resampleCost == 'N/A') {
         return false;
@@ -165,10 +174,8 @@ class _EHArchiveDialogState extends State<EHArchiveDialog> {
       if (archive.resampleCost!.contains('Free')) {
         return true;
       }
-      if (archive.resampleCost!.contains('GP')) {
-        return (archive.gpCount ?? double.maxFinite) >= int.parse(archive.resampleCost!.split(' ')[0]);
-      }
-      return (archive.creditCount ?? double.maxFinite) >= int.parse(archive.resampleCost!.split(' ')[0]);
+
+      return true;
     }
   }
 
@@ -192,14 +199,16 @@ class _EHArchiveDialogState extends State<EHArchiveDialog> {
 class _ArchiveButtonSet extends StatelessWidget {
   final String? cost;
   final String? size;
-  final String text;
+  final String? text;
+  final Icon? icon;
   final VoidCallback? callback;
 
   const _ArchiveButtonSet({
     Key? key,
     this.cost,
     this.size,
-    required this.text,
+    this.text,
+    this.icon,
     this.callback,
   }) : super(key: key);
 
@@ -217,8 +226,8 @@ class _ArchiveButtonSet extends StatelessWidget {
           onPressed: callback,
           child: Row(
             children: [
-              Text(text, style: const TextStyle(fontSize: UIConfig.archiveDialogDownloadTextSize)),
-              const Icon(Icons.download_for_offline, size: UIConfig.archiveDialogDownloadIconSize),
+              if (text != null) Text(text!, style: const TextStyle(fontSize: UIConfig.archiveDialogDownloadTextSize)),
+              if (icon != null) icon!,
             ],
           ),
         ),
