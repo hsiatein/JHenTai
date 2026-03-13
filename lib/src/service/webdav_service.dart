@@ -1,26 +1,21 @@
-import 'dart:async';
 import 'dart:core';
 import 'dart:io' as io;
 import 'package:dio/dio.dart';
 
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
-import 'package:get/get_rx/get_rx.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 import 'package:get/get_utils/get_utils.dart';
-import 'package:jhentai/src/database/database.dart';
 
 import 'package:jhentai/src/setting/network_setting.dart';
 
 import 'package:jhentai/src/service/log.dart';
-import 'package:jhentai/src/utils/toast_util.dart';
 
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/service/cloud_service.dart';
 
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'jh_service.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav_client;
@@ -32,6 +27,95 @@ import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:http_parser/http_parser.dart';
 import 'dart:typed_data';
+
+Future<void> _zipFolderInIsolate(Map<String, String> args) async {
+  final String? zipFilePath = args['zipFilePath'];
+  final String? folderPath = args['folderPath'];
+  if (zipFilePath == null || folderPath == null) {
+    return;
+  }
+
+  final encoder = ZipFileEncoder();
+  encoder.create(zipFilePath);
+  encoder.addDirectory(io.Directory(folderPath));
+  encoder.close();
+}
+
+Future<void> _extractZipInIsolate(List<String> args) async {
+  if (args.length < 2) {
+    return;
+  }
+  await extractFileToDisk(args[0], args[1]);
+}
+
+Future<void> _cleanZipFileInIsolate(String filePath) async {
+  final file = io.File(filePath);
+  final bytes = await file.readAsBytes();
+  if (bytes.length < 2) {
+    return;
+  }
+
+  const List<int> zipStart = [0x50, 0x4b];
+  const List<int> boundarySequence = [0x0d, 0x0a, 0x0d, 0x0a, 0x50, 0x4b];
+  const List<int> endSequence = [0x0d, 0x0a, 0x2d, 0x2d, 0x2d, 0x2d];
+
+  if (bytes[0] == zipStart[0] && bytes[1] == zipStart[1]) {
+    return;
+  }
+  if (bytes[0] != 0x2d) {
+    return;
+  }
+
+  final int startIndex = _findSequenceIndexNoAlloc(bytes, boundarySequence) + 4;
+  if (startIndex < 4 || startIndex >= bytes.length) {
+    return;
+  }
+
+  final Uint8List cleanedBytes = Uint8List.sublistView(bytes, startIndex);
+  final int endIndex = _findSequenceIndexNoAlloc(cleanedBytes, endSequence, fromEnd: true);
+  if (endIndex <= 0) {
+    return;
+  }
+
+  await file.writeAsBytes(cleanedBytes.sublist(0, endIndex), flush: true);
+}
+
+int _findSequenceIndexNoAlloc(Uint8List bytes, List<int> sequence, {bool fromEnd = false}) {
+  final int sequenceLength = sequence.length;
+  if (sequenceLength == 0 || bytes.length < sequenceLength) {
+    return -1;
+  }
+
+  if (fromEnd) {
+    for (int i = bytes.length - sequenceLength; i >= 0; i--) {
+      bool matches = true;
+      for (int j = 0; j < sequenceLength; j++) {
+        if (bytes[i + j] != sequence[j]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  for (int i = 0; i <= bytes.length - sequenceLength; i++) {
+    bool matches = true;
+    for (int j = 0; j < sequenceLength; j++) {
+      if (bytes[i + j] != sequence[j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return i;
+    }
+  }
+  return -1;
+}
 
 /// Responsible for local images meta-data and download all images of a gallery
 WebDAVService webdavService = WebDAVService();
@@ -82,7 +166,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       log.info('清除缓存');
       io.Directory cache=io.Directory(webdavCachePath);
       if(await cache.exists()){
-        Iterable<io.File> files= cache.listSync().whereType<io.File>();
+        final files = await _listFiles(cache);
         for(var file in files){
           await file.delete();
         }
@@ -127,7 +211,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
           return;
         }
         final directory = io.Directory(downloadSetting.downloadPath.value);
-        var folders = directory.listSync().whereType<io.Directory>();
+        final folders = await _listDirectories(directory);
         for (var zipFileCloud in cloudList) {
           try{
             log.info('检查是否需要下载'+(path.basename(zipFileCloud.path??'')));
@@ -143,14 +227,14 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
                 String metadataPath=path.join(folder.path,'metadata');
                 io.File metadataFile=io.File(metadataPath);
                 if(!(await metadataFile.exists())){
-                  folder.delete();
+                  await folder.delete();
                   break;
                 }
                 String metadata=await metadataFile.readAsString();
                 Map<String, dynamic> metadataMap = jsonDecode(metadata);
                 if (metadataMap["gallery"]['downloadStatusIndex'] != 4) {
                   log.info('${path.basename(folder.path)} 未下载完成');
-                  Iterable<io.File> files= folder.listSync().whereType<io.File>();
+                  final files = await _listFiles(folder);
                   for(var file in files){
                     await file.delete();
                   }
@@ -184,7 +268,11 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
       String zipPath='$webdavCachePath/$gid.zip';
       await webdavClient?.read2File(remotePath, zipPath);
       await _cleanFile(zipPath);
-      await extractFileToDisk(zipPath, downloadSetting.downloadPath.value);
+      await isolateService.run<List<String>, void>(
+        _extractZipInIsolate,
+        <String>[zipPath, downloadSetting.downloadPath.value],
+        debugLabel: 'webdav_extract_zip',
+      );
       //io.File(zipPath).delete();
       galleryDownloadService.restoreTasks();
       log.info('下载 $gid 成功');
@@ -200,7 +288,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         var cloudList = await webdavClient?.readDir('/JHentaiData/download');
         
         final directory = io.Directory(downloadSetting.downloadPath.value);
-        var folders = directory.listSync().whereType<io.Directory>();
+        final folders = await _listDirectories(directory);
         for (var folder in folders) {
           try{
             log.info(folder.path);
@@ -276,7 +364,7 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
         await webdavClient?.mkdir('$webdavRemotePath/download');
         log.info(downloadSetting.downloadPath.value);
         final directory = io.Directory(downloadSetting.downloadPath.value);
-        var folders = directory.listSync().whereType<io.Directory>();
+        final folders = await _listDirectories(directory);
         for (var folder in folders) {
           if (!(path.basename(folder.path).startsWith('$gid - '))) {
             continue;
@@ -302,37 +390,11 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
   }
 
   Future<void> _cleanFile(String filePath) async {
-    final file = io.File(filePath);
-    final bytes = await file.readAsBytes();
-
-    // 定义需要查找的字节序列
-    final List<int> targetStart = [0x50, 0x4b]; // ZIP 文件开头
-    final List<int> boundarySequence = [
-      0x0d, 0x0a, 0x0d, 0x0a, 0x50, 0x4b
-    ]; // 边界序列
-
-    final List<int> endSequence = [
-      0x0d, 0x0a, 0x2d, 0x2d, 0x2d, 0x2d
-    ]; // 结束序列
-
-    // 检查文件开头
-    if (bytes[0] == targetStart[0] && bytes[1] == targetStart[1]) {
-      return; // 文件以 50 4b 开头，不做处理
-    } else if (bytes[0] == 0x2d) {
-      // 文件以 2d 开头，进行处理
-      // 查找边界序列
-      final startIndex = _findSequenceIndex(bytes,boundarySequence)+4;
-      // 创建新的字节数组，从边界序列开始
-      final cleanedBytes = bytes.sublist(startIndex);
-      // 从后往前查找结束序列
-      final endIndex = _findSequenceIndex(cleanedBytes,endSequence,fromEnd: true);
-
-      // 创建最终的字节数组，去掉结束序列之前的内容
-      final finalBytes = cleanedBytes.sublist(0, endIndex).toList();
-
-      // 写回文件
-      await file.writeAsBytes(finalBytes);
-    } 
+    await isolateService.run<String, void>(
+      _cleanZipFileInIsolate,
+      filePath,
+      debugLabel: 'webdav_clean_zip',
+    );
   }
 
   Future<void> _uploadFile(String filePath, String remotePath) async {
@@ -382,10 +444,14 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     if (await io.File(zipFilePath).exists()) {
       return;
     }
-    final encoder = ZipFileEncoder();
-    encoder.create(zipFilePath);
-    encoder.addDirectory(io.Directory(folderPath));
-    encoder.close();
+    await isolateService.run<Map<String, String>, void>(
+      _zipFolderInIsolate,
+      <String, String>{
+        'zipFilePath': zipFilePath,
+        'folderPath': folderPath,
+      },
+      debugLabel: 'webdav_zip_folder',
+    );
     log.info('Folder zip successfully: $zipFilePath');
   }
 
@@ -510,28 +576,25 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     }
   }
 
-  int _findSequenceIndex(Uint8List bytes, List<int> sequence, {bool fromEnd = false}) {
-    final sequenceLength = sequence.length;
-    for (int i = (fromEnd ? bytes.length - sequenceLength : 0);
-        fromEnd ? i >= 0 : i <= bytes.length - sequenceLength;
-        fromEnd ? i-- : i++) {
-      if (_listEqual(bytes.sublist(i, i + sequenceLength).toList(),sequence)) {
-        return i;
+  Future<List<io.Directory>> _listDirectories(io.Directory directory) async {
+    final List<io.Directory> result = <io.Directory>[];
+    await for (final entity in directory.list()) {
+      if (entity is io.Directory) {
+        result.add(entity);
       }
     }
-    return -1;
+    return result;
   }
 
-  bool _listEqual(List<int> a,List<int> b){
-    if (a.length != b.length){
-      return false;
-    }
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]){
-        return false;
+  Future<List<io.File>> _listFiles(io.Directory directory) async {
+    final List<io.File> result = <io.File>[];
+    await for (final entity in directory.list()) {
+      if (entity is io.File) {
+        result.add(entity);
       }
     }
-    return true;
+    return result;
   }
 
 }
+
