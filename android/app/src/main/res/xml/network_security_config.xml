@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config>
+        <trust-anchors>
+            <!-- 信任系统预装的 CA 证书 -->
+            <certificates src="system" />
+            <!-- 信任用户自己安装的 CA 证书 -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
