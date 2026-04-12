@@ -1,6 +1,7 @@
 import 'dart:core';
 import 'dart:io' as io;
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
@@ -138,6 +139,14 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     if(enable){
       Get.put(this, permanent: true);
       webdavClient=webdav_client.newClient(networkSetting.webdavURL.value ?? '', user: networkSetting.webdavUserName.value ?? '', password: networkSetting.webdavPassword.value ?? '');
+
+      /// 让 WebDAV 的 Dio 信任用户自行安装的 CA 证书（如自签名证书、抓包工具证书等）
+      (webdavClient!.c.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = io.HttpClient();
+        client.badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
+        return client;
+      };
+
       await webdavClient?.mkdir('/JHentaiData');
       final directory =pathService.getVisibleDir();
       log.info(directory.path);
