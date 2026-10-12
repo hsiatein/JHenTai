@@ -418,6 +418,14 @@ class WebDAVService extends GetxController with JHLifeCircleBeanErrorCatch imple
     String username=webdavClient?.auth.user ?? '';
     String password=webdavClient?.auth.pwd ?? '';
     Dio dio = Dio();
+
+    /// 让上传用的 Dio 也信任用户自行安装的 CA 证书
+    (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      final client = io.HttpClient();
+      client.badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
+      return client;
+    };
+
     // 设置基本认证
     String basicAuth = 'Basic ${base64Encode(utf8.encode('$username:$password'))}';
     dio.options.headers['Authorization'] = basicAuth;
